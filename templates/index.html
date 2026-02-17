@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PhishGuard AI — Phishing Email Generator for Security Training</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <!-- ─── Header ───────────────────────────────────────────── -->
+    <header class="app-header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">🛡️</div>
+                <div>
+                    <h1>PhishGuard <span class="accent">AI</span></h1>
+                    <p class="tagline">Parameterized Phishing Email Generator for Security Awareness Training</p>
+                </div>
+            </div>
+            <div class="header-badge">
+                <span class="badge-dot"></span>
+                <span>Educational Use Only</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- ─── Main Layout ──────────────────────────────────────── -->
+    <main class="app-main">
+        <!-- Left Panel: Controls -->
+        <aside class="control-panel">
+            <div class="panel-card">
+                <h2 class="panel-title">
+                    <span class="panel-icon">⚙️</span>
+                    Email Parameters
+                </h2>
+
+                <!-- Context -->
+                <div class="form-group">
+                    <label class="form-label">Department Context</label>
+                    <div class="select-wrapper">
+                        <select id="context">
+                            <option value="IT">🖥️ IT Department</option>
+                            <option value="HR">👥 Human Resources</option>
+                            <option value="Finance">💰 Finance</option>
+                            <option value="Management">👔 Management</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Emotional Trigger -->
+                <div class="form-group">
+                    <label class="form-label">Emotional Trigger</label>
+                    <div class="trigger-grid">
+                        <button class="trigger-btn active" data-value="urgency">
+                            <span class="trigger-icon">⏰</span>
+                            <span>Urgency</span>
+                        </button>
+                        <button class="trigger-btn" data-value="authority">
+                            <span class="trigger-icon">👑</span>
+                            <span>Authority</span>
+                        </button>
+                        <button class="trigger-btn" data-value="fear">
+                            <span class="trigger-icon">😨</span>
+                            <span>Fear</span>
+                        </button>
+                        <button class="trigger-btn" data-value="reward">
+                            <span class="trigger-icon">🎁</span>
+                            <span>Reward</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Attachment Type -->
+                <div class="form-group">
+                    <label class="form-label">Attachment Indicator</label>
+                    <div class="select-wrapper">
+                        <select id="attachment_type">
+                            <option value="none">No attachment</option>
+                            <option value="double_extension">📄 Double Extension (.pdf.exe)</option>
+                            <option value="compressed">📦 Compressed Archive (.zip)</option>
+                            <option value="macro_enabled">📊 Macro-Enabled Document (.docm)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Link Type -->
+                <div class="form-group">
+                    <label class="form-label">Link Indicator</label>
+                    <div class="select-wrapper">
+                        <select id="link_type">
+                            <option value="none">No suspicious link</option>
+                            <option value="ip_based">🔢 IP-Based URL</option>
+                            <option value="typosquatting">🔤 Typosquatting Domain</option>
+                            <option value="shortened">🔗 URL Shortener</option>
+                            <option value="subdomain_spoof">🌐 Subdomain Spoofing</option>
+                            <option value="http">🔓 HTTP (No Encryption)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Generate Button -->
+                <button id="generateBtn" class="generate-btn" onclick="generateEmail()">
+                    <span class="btn-icon">⚡</span>
+                    <span>Generate Phishing Email</span>
+                </button>
+            </div>
+
+            <!-- History Panel -->
+            <div class="panel-card history-panel">
+                <h2 class="panel-title">
+                    <span class="panel-icon">📜</span>
+                    History
+                    <button class="refresh-btn" onclick="loadHistory()" title="Refresh">🔄</button>
+                </h2>
+                <div id="historyList" class="history-list">
+                    <p class="empty-state">No emails generated yet</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Right Panel: Email Preview -->
+        <section class="preview-section">
+            <!-- Toolbar -->
+            <div class="preview-toolbar">
+                <div class="toolbar-left">
+                    <h2>📧 Email Preview</h2>
+                </div>
+                <div class="toolbar-right">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="redFlagToggle" onchange="toggleRedFlags()">
+                        <span class="toggle-slider"></span>
+                        <span class="toggle-label">🚩 Red Flag Highlights</span>
+                    </label>
+                    <button class="toolbar-btn" onclick="exportEmail()" id="exportBtn" disabled>
+                        📥 Export HTML
+                    </button>
+                </div>
+            </div>
+
+            <!-- Email Display -->
+            <div class="email-container" id="emailContainer">
+                <div class="email-placeholder" id="emailPlaceholder">
+                    <div class="placeholder-icon">📨</div>
+                    <h3>No Email Generated</h3>
+                    <p>Select your parameters and click <strong>Generate</strong> to create a simulated phishing email.</p>
+                </div>
+
+                <!-- Email Preview (hidden initially) -->
+                <div class="email-preview" id="emailPreview" style="display: none;">
+                    <div class="email-header-bar">
+                        <div class="email-meta">
+                            <div class="email-from">
+                                <span class="meta-label">From:</span>
+                                <span id="emailFrom" class="meta-value"></span>
+                            </div>
+                            <div class="email-subject-line">
+                                <span class="meta-label">Subject:</span>
+                                <span id="emailSubject" class="meta-value subject-text"></span>
+                            </div>
+                            <div class="email-date">
+                                <span class="meta-label">Date:</span>
+                                <span id="emailDate" class="meta-value"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="email-body" id="emailBody"></div>
+                </div>
+            </div>
+
+            <!-- Red Flag Analysis Panel -->
+            <div class="analysis-panel" id="analysisPanel" style="display: none;">
+                <h3 class="analysis-title">🔍 Red Flag Analysis</h3>
+                <div id="indicatorList" class="indicator-list"></div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+        <p>⚠️ <strong>Educational & Research Purposes Only</strong> — This tool does not send real emails. All content is generated for controlled security awareness training.</p>
+        <p class="footer-credits">AI in Cybersecurity — Muhammad Sohaib (22K-4751) & Zeerak Shahzad (22K-4692)</p>
+    </footer>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+        <div class="loading-card">
+            <div class="spinner"></div>
+            <p>Generating phishing email...</p>
+            <p class="loading-sub">AI is crafting a realistic scenario</p>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
