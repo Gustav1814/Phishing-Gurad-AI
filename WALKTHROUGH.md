@@ -4,6 +4,7 @@
 
 ## Project Structure
 
+- **GitHub Repository:** [Gustav1814/Phishing-Gurad-AI](https://github.com/Gustav1814/Phishing-Gurad-AI)
 - **Backend:** Flask (Python) with REST API routes.
 - **AI Engine:** Google Gemini (Free Tier) + Rule-Based Fallback Engine (No API Key required).
 - **Frontend:** HTML5/CSS3/JavaScript with a premium dark-themed UI.
