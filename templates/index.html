@@ -1,197 +1,569 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PhishGuard AI — Phishing Email Generator for Security Training</title>
+    <title>PhishGuard AI | Intelligent Phishing Threat Platform</title>
+    <meta name="description"
+        content="AI-driven phishing simulation and detection platform for enterprise security awareness training.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
+
 <body>
-    <!-- ─── Header ───────────────────────────────────────────── -->
-    <header class="app-header">
-        <div class="header-content">
-            <div class="logo">
-                <div class="logo-icon">🛡️</div>
-                <div>
-                    <h1>PhishGuard <span class="accent">AI</span></h1>
-                    <p class="tagline">Parameterized Phishing Email Generator for Security Awareness Training</p>
-                </div>
-            </div>
-            <div class="header-badge">
-                <span class="badge-dot"></span>
-                <span>Educational Use Only</span>
-            </div>
-        </div>
-    </header>
+    <div class="app-wrapper">
+        <!-- Ambient Background -->
+        <canvas id="particleCanvas" class="particle-canvas"></canvas>
+        <div class="ambient-orb orb-1"></div>
+        <div class="ambient-orb orb-2"></div>
 
-    <!-- ─── Main Layout ──────────────────────────────────────── -->
-    <main class="app-main">
-        <!-- Left Panel: Controls -->
-        <aside class="control-panel">
-            <div class="panel-card">
-                <h2 class="panel-title">
-                    <span class="panel-icon">⚙️</span>
-                    Email Parameters
+        <!-- Toast Container -->
+        <div id="toastContainer" class="toast-container"></div>
+
+        <!-- ─── Navigation ────────────────────────────────────── -->
+        <header class="app-header">
+            <div class="header-inner">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <i data-lucide="shield-check"></i>
+                    </div>
+                    <div>
+                        <h1>PhishGuard <span class="gradient-text">AI</span></h1>
+                        <p class="logo-tagline">Threat Intelligence Platform</p>
+                    </div>
+                </div>
+                <nav class="header-nav">
+                    <div class="nav-links">
+                        <a href="#generator" class="nav-link active">
+                            <i data-lucide="mail-warning"></i>
+                            <span>Generator</span>
+                        </a>
+                        <a href="#inboxScannerSection" class="nav-link">
+                            <i data-lucide="inbox"></i>
+                            <span>Inbox Scanner</span>
+                        </a>
+                    </div>
+                    <div class="status-indicator" id="aiStatusIndicator">
+                        <span class="status-dot"></span>
+                        <span class="status-label" id="aiStatusLabel">Initializing...</span>
+                    </div>
+                </nav>
+            </div>
+        </header>
+
+        <!-- ─── Hero Section ──────────────────────────────────── -->
+        <section class="hero-section">
+            <div class="hero-content">
+                <div class="hero-badge">
+                    <i data-lucide="sparkles"></i>
+                    <span>Powered by Google Gemini AI</span>
+                </div>
+                <h2 class="hero-title">
+                    AI-Driven <span class="gradient-text">Phishing Simulation</span><br>
+                    & Detection Engine
                 </h2>
-
-                <!-- Context -->
-                <div class="form-group">
-                    <label class="form-label">Department Context</label>
-                    <div class="select-wrapper">
-                        <select id="context">
-                            <option value="IT">🖥️ IT Department</option>
-                            <option value="HR">👥 Human Resources</option>
-                            <option value="Finance">💰 Finance</option>
-                            <option value="Management">👔 Management</option>
-                        </select>
+                <p class="hero-subtitle">Generate realistic phishing scenarios, send them to real inboxes, and detect
+                    threats with enterprise-grade AI analysis.</p>
+                <div class="hero-stats">
+                    <div class="hero-stat">
+                        <span class="stat-value" data-target="6">0</span>
+                        <span class="stat-label">Attack Vectors</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="hero-stat">
+                        <span class="stat-value" id="emailCounter" data-target="0">0</span>
+                        <span class="stat-label">Emails Generated</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="hero-stat">
+                        <span class="stat-value" data-target="95">0</span>
+                        <span class="stat-label">Detection Rate %</span>
                     </div>
                 </div>
-
-                <!-- Emotional Trigger -->
-                <div class="form-group">
-                    <label class="form-label">Emotional Trigger</label>
-                    <div class="trigger-grid">
-                        <button class="trigger-btn active" data-value="urgency">
-                            <span class="trigger-icon">⏰</span>
-                            <span>Urgency</span>
-                        </button>
-                        <button class="trigger-btn" data-value="authority">
-                            <span class="trigger-icon">👑</span>
-                            <span>Authority</span>
-                        </button>
-                        <button class="trigger-btn" data-value="fear">
-                            <span class="trigger-icon">😨</span>
-                            <span>Fear</span>
-                        </button>
-                        <button class="trigger-btn" data-value="reward">
-                            <span class="trigger-icon">🎁</span>
-                            <span>Reward</span>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Attachment Type -->
-                <div class="form-group">
-                    <label class="form-label">Attachment Indicator</label>
-                    <div class="select-wrapper">
-                        <select id="attachment_type">
-                            <option value="none">No attachment</option>
-                            <option value="double_extension">📄 Double Extension (.pdf.exe)</option>
-                            <option value="compressed">📦 Compressed Archive (.zip)</option>
-                            <option value="macro_enabled">📊 Macro-Enabled Document (.docm)</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Link Type -->
-                <div class="form-group">
-                    <label class="form-label">Link Indicator</label>
-                    <div class="select-wrapper">
-                        <select id="link_type">
-                            <option value="none">No suspicious link</option>
-                            <option value="ip_based">🔢 IP-Based URL</option>
-                            <option value="typosquatting">🔤 Typosquatting Domain</option>
-                            <option value="shortened">🔗 URL Shortener</option>
-                            <option value="subdomain_spoof">🌐 Subdomain Spoofing</option>
-                            <option value="http">🔓 HTTP (No Encryption)</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Generate Button -->
-                <button id="generateBtn" class="generate-btn" onclick="generateEmail()">
-                    <span class="btn-icon">⚡</span>
-                    <span>Generate Phishing Email</span>
-                </button>
-            </div>
-
-            <!-- History Panel -->
-            <div class="panel-card history-panel">
-                <h2 class="panel-title">
-                    <span class="panel-icon">📜</span>
-                    History
-                    <button class="refresh-btn" onclick="loadHistory()" title="Refresh">🔄</button>
-                </h2>
-                <div id="historyList" class="history-list">
-                    <p class="empty-state">No emails generated yet</p>
-                </div>
-            </div>
-        </aside>
-
-        <!-- Right Panel: Email Preview -->
-        <section class="preview-section">
-            <!-- Toolbar -->
-            <div class="preview-toolbar">
-                <div class="toolbar-left">
-                    <h2>📧 Email Preview</h2>
-                </div>
-                <div class="toolbar-right">
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="redFlagToggle" onchange="toggleRedFlags()">
-                        <span class="toggle-slider"></span>
-                        <span class="toggle-label">🚩 Red Flag Highlights</span>
-                    </label>
-                    <button class="toolbar-btn" onclick="exportEmail()" id="exportBtn" disabled>
-                        📥 Export HTML
-                    </button>
-                </div>
-            </div>
-
-            <!-- Email Display -->
-            <div class="email-container" id="emailContainer">
-                <div class="email-placeholder" id="emailPlaceholder">
-                    <div class="placeholder-icon">📨</div>
-                    <h3>No Email Generated</h3>
-                    <p>Select your parameters and click <strong>Generate</strong> to create a simulated phishing email.</p>
-                </div>
-
-                <!-- Email Preview (hidden initially) -->
-                <div class="email-preview" id="emailPreview" style="display: none;">
-                    <div class="email-header-bar">
-                        <div class="email-meta">
-                            <div class="email-from">
-                                <span class="meta-label">From:</span>
-                                <span id="emailFrom" class="meta-value"></span>
-                            </div>
-                            <div class="email-subject-line">
-                                <span class="meta-label">Subject:</span>
-                                <span id="emailSubject" class="meta-value subject-text"></span>
-                            </div>
-                            <div class="email-date">
-                                <span class="meta-label">Date:</span>
-                                <span id="emailDate" class="meta-value"></span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="email-body" id="emailBody"></div>
-                </div>
-            </div>
-
-            <!-- Red Flag Analysis Panel -->
-            <div class="analysis-panel" id="analysisPanel" style="display: none;">
-                <h3 class="analysis-title">🔍 Red Flag Analysis</h3>
-                <div id="indicatorList" class="indicator-list"></div>
             </div>
         </section>
-    </main>
 
-    <!-- Footer -->
-    <footer class="app-footer">
-        <p>⚠️ <strong>Educational & Research Purposes Only</strong> — This tool does not send real emails. All content is generated for controlled security awareness training.</p>
-        <p class="footer-credits">AI in Cybersecurity — Muhammad Sohaib (22K-4751) & Zeerak Shahzad (22K-4692)</p>
-    </footer>
+        <!-- ─── Generator Section ─────────────────────────────── -->
+        <main class="main-content" id="generator">
+            <!-- Left Panel: Configuration -->
+            <aside class="config-panel">
+                <div class="panel-card glass-card">
+                    <div class="panel-header">
+                        <div class="panel-icon"><i data-lucide="settings-2"></i></div>
+                        <div>
+                            <h2 class="panel-title">Attack Parameters</h2>
+                            <p class="panel-subtitle">Configure simulation vectors</p>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i data-lucide="zap"></i> Emotional Trigger
+                        </label>
+                        <div class="trigger-grid" id="triggerGrid">
+                            <button class="trigger-btn active" data-trigger="urgency">
+                                <i data-lucide="alarm-clock"></i>
+                                <span>Urgency</span>
+                            </button>
+                            <button class="trigger-btn" data-trigger="authority">
+                                <i data-lucide="crown"></i>
+                                <span>Authority</span>
+                            </button>
+                            <button class="trigger-btn" data-trigger="fear">
+                                <i data-lucide="shield-alert"></i>
+                                <span>Fear</span>
+                            </button>
+                            <button class="trigger-btn" data-trigger="reward">
+                                <i data-lucide="gift"></i>
+                                <span>Reward</span>
+                            </button>
+                            <button class="trigger-btn" data-trigger="curiosity">
+                                <i data-lucide="eye"></i>
+                                <span>Curiosity</span>
+                            </button>
+                            <button class="trigger-btn" data-trigger="social_proof">
+                                <i data-lucide="users"></i>
+                                <span>Social Proof</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i data-lucide="building-2"></i> Attack Context
+                        </label>
+                        <div class="select-wrapper">
+                            <select id="context">
+                                <option value="workplace">Corporate / Workplace</option>
+                                <option value="banking">Financial / Banking</option>
+                                <option value="ecommerce">E-Commerce / Retail</option>
+                                <option value="government">Government / Legal</option>
+                                <option value="healthcare">Healthcare / Medical</option>
+                                <option value="education">Education / Academic</option>
+                            </select>
+                            <i data-lucide="chevron-down" class="select-icon"></i>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i data-lucide="link-2"></i> Suspicious Link Type
+                        </label>
+                        <div class="select-wrapper">
+                            <select id="link_type">
+                                <option value="none">No Link</option>
+                                <option value="ip_based" selected>IP-Based URL</option>
+                                <option value="typosquatting">Typosquatting Domain</option>
+                                <option value="subdomain">Deceptive Subdomain</option>
+                                <option value="shortened">Shortened URL</option>
+                            </select>
+                            <i data-lucide="chevron-down" class="select-icon"></i>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i data-lucide="paperclip"></i> Attachment Type
+                        </label>
+                        <div class="select-wrapper">
+                            <select id="attachment_type">
+                                <option value="none" selected>No Attachment</option>
+                                <option value="double_extension">Double Extension (.pdf.exe)</option>
+                                <option value="macro_doc">Macro Document (.docm)</option>
+                                <option value="archive">Compressed Archive (.zip)</option>
+                            </select>
+                            <i data-lucide="chevron-down" class="select-icon"></i>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i data-lucide="gauge"></i> Sophistication Level
+                        </label>
+                        <div class="select-wrapper">
+                            <select id="sophisticationSelect">
+                                <option value="low">Low | Obvious Red Flags</option>
+                                <option value="medium" selected>Medium | Realistic</option>
+                                <option value="high">High | Targeted Spear Phishing</option>
+                            </select>
+                            <i data-lucide="chevron-down" class="select-icon"></i>
+                        </div>
+                    </div>
+
+                    <button class="generate-btn" id="generateBtn" onclick="generateEmail()">
+                        <i data-lucide="wand-sparkles" class="btn-icon"></i>
+                        <span class="btn-text">Generate Phishing Email</span>
+                    </button>
+                </div>
+
+                <!-- History Panel -->
+                <div class="panel-card glass-card history-panel">
+                    <div class="panel-header">
+                        <div class="history-header-left">
+                            <div class="panel-icon"><i data-lucide="clock"></i></div>
+                            <div>
+                                <h2 class="panel-title">History</h2>
+                                <p class="panel-subtitle">Recent generations</p>
+                            </div>
+                        </div>
+                        <button class="refresh-btn" onclick="loadHistory()" title="Refresh History">
+                            <i data-lucide="refresh-cw"></i>
+                        </button>
+                    </div>
+                    <div id="historyList" class="history-list">
+                        <div class="empty-state">
+                            <i data-lucide="mail-x" class="empty-icon-svg"></i>
+                            <p>No emails generated yet</p>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Right Panel: Email Preview -->
+            <section class="preview-section">
+                <!-- Toolbar -->
+                <div class="preview-toolbar glass-card">
+                    <div class="toolbar-left">
+                        <i data-lucide="mail-open"></i>
+                        <h2>Email Preview</h2>
+                    </div>
+                    <div class="toolbar-right">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="redFlagToggle" onchange="toggleRedFlags()">
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-label">
+                                <i data-lucide="flag-triangle-right"></i> Red Flags
+                            </span>
+                        </label>
+                        <button class="toolbar-btn analyze-btn" onclick="analyzeEmail()" id="analyzeBtn" disabled>
+                            <i data-lucide="brain"></i> Analyze
+                        </button>
+                        <button class="toolbar-btn send-btn" onclick="openSendModal()" id="sendBtn" disabled>
+                            <i data-lucide="send"></i> Send
+                        </button>
+                        <button class="toolbar-btn" onclick="exportEmail()" id="exportBtn" disabled>
+                            <i data-lucide="download"></i> Export
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Email Display -->
+                <div class="email-container glass-card" id="emailContainer">
+                    <div class="email-placeholder" id="emailPlaceholder">
+                        <i data-lucide="mail-plus" class="placeholder-icon-svg"></i>
+                        <h3>No Email Generated</h3>
+                        <p>Configure your attack parameters and click <strong>Generate</strong> to create a
+                            simulated phishing email with AI-powered analysis.</p>
+                    </div>
+
+                    <!-- Email Preview (hidden initially) -->
+                    <div class="email-preview" id="emailPreview" style="display: none;">
+                        <div class="email-chrome">
+                            <div class="chrome-dot red"></div>
+                            <div class="chrome-dot yellow"></div>
+                            <div class="chrome-dot green"></div>
+                            <span class="chrome-title">Inbox | Simulated Email Client</span>
+                        </div>
+                        <div class="email-header-block">
+                            <div class="email-from">
+                                <strong>From:</strong> <span id="emailFrom"></span>
+                            </div>
+                            <div class="email-subject-line">
+                                <strong>Subject:</strong> <span id="emailSubject"></span>
+                            </div>
+                            <div class="email-date">
+                                <strong>Date:</strong> <span id="emailDate"></span>
+                            </div>
+                        </div>
+                        <div class="email-body" id="emailBody"></div>
+                    </div>
+                </div>
+
+                <!-- Phishing Indicators -->
+                <div class="indicators-panel glass-card" id="indicatorsPanel" style="display: none;">
+                    <div class="panel-header">
+                        <div class="panel-icon"><i data-lucide="scan-search"></i></div>
+                        <div>
+                            <h3 class="panel-title">Threat Indicators</h3>
+                            <p class="panel-subtitle">Detected suspicious elements</p>
+                        </div>
+                    </div>
+                    <div id="indicatorList" class="indicator-list"></div>
+                </div>
+
+                <!-- AI Analysis Panel -->
+                <div class="ai-analysis-panel glass-card" id="aiAnalysisPanel" style="display: none;">
+                    <div class="ai-analysis-header">
+                        <div class="ai-analysis-icon"><i data-lucide="brain-circuit"></i></div>
+                        <h3 class="ai-analysis-title">AI Threat Intelligence Report</h3>
+                        <span class="ai-analysis-badge" id="aiPoweredBy">Google Gemini AI</span>
+                    </div>
+
+                    <!-- Threat Score Gauge -->
+                    <div class="threat-gauge-container">
+                        <div class="threat-gauge">
+                            <svg class="gauge-svg" viewBox="0 0 120 120">
+                                <circle class="gauge-bg" cx="60" cy="60" r="52" />
+                                <circle class="gauge-fill" id="gaugeFill" cx="60" cy="60" r="52"
+                                    stroke-dasharray="0 327" stroke-dashoffset="0" />
+                            </svg>
+                            <div class="gauge-value">
+                                <span class="gauge-number" id="gaugeNumber">0</span>
+                                <span class="gauge-label">/ 100</span>
+                            </div>
+                        </div>
+                        <div class="threat-level" id="threatLevel">ANALYZING</div>
+                    </div>
+
+                    <div class="ai-summary" id="aiSummary"></div>
+                    <div class="ai-red-flags" id="aiRedFlags"></div>
+                    <div class="ai-tactics" id="aiTactics"></div>
+                    <div class="ai-recommendation" id="aiRecommendation"></div>
+                </div>
+            </section>
+        </main>
+
+        <!-- ─── Inbox Scanner Section ──────────────────────────── -->
+        <section class="inbox-scanner-section" id="inboxScannerSection">
+            <div class="section-header">
+                <div class="section-badge">
+                    <i data-lucide="radar"></i>
+                    <span>Live Threat Detection</span>
+                </div>
+                <h2 class="section-title">Inbox <span class="gradient-text">Scanner</span></h2>
+                <p class="section-subtitle">Connect your email inbox and let AI analyze your real emails for phishing
+                    threats.
+                    Your credentials are never stored — used only for real-time IMAP connection.</p>
+            </div>
+
+            <div class="scanner-layout">
+                <!-- Connection Panel -->
+                <div class="scanner-connect glass-card">
+                    <div class="panel-header">
+                        <div class="panel-icon"><i data-lucide="lock-keyhole"></i></div>
+                        <div>
+                            <h3 class="panel-title">Connect Inbox</h3>
+                            <p class="panel-subtitle">Gmail, Outlook, Yahoo & more</p>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i data-lucide="at-sign"></i> Email Address
+                        </label>
+                        <input type="email" id="inboxEmail" class="form-input" placeholder="you@gmail.com">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i data-lucide="key-round"></i> App Password
+                            <a href="https://myaccount.google.com/apppasswords" target="_blank" class="help-link">Get
+                                App Password</a>
+                        </label>
+                        <input type="password" id="inboxPassword" class="form-input"
+                            placeholder="App-specific password">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i data-lucide="server"></i> IMAP Server
+                            <span class="label-hint">(auto-detected)</span>
+                        </label>
+                        <input type="text" id="imapServer" class="form-input" placeholder="imap.gmail.com (auto)">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i data-lucide="hash"></i> Emails to Scan
+                        </label>
+                        <div class="select-wrapper">
+                            <select id="scanCount">
+                                <option value="5">5 emails</option>
+                                <option value="10" selected>10 emails</option>
+                                <option value="15">15 emails</option>
+                                <option value="20">20 emails (slower)</option>
+                            </select>
+                            <i data-lucide="chevron-down" class="select-icon"></i>
+                        </div>
+                    </div>
+
+                    <button id="scanBtn" class="generate-btn scan-btn" onclick="scanInbox()">
+                        <i data-lucide="scan-search" class="btn-icon"></i>
+                        <span class="btn-text">Scan Inbox with AI</span>
+                    </button>
+
+                    <div class="inbox-info">
+                        <div class="info-row">
+                            <i data-lucide="shield-check"></i>
+                            <p><strong>Privacy:</strong> Emails are analyzed in real-time. No data is stored.</p>
+                        </div>
+                        <div class="info-row">
+                            <i data-lucide="info"></i>
+                            <p><strong>Gmail:</strong> Enable 2-Step Verification → <a
+                                    href="https://myaccount.google.com/apppasswords" target="_blank">Create App
+                                    Password</a></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scan Results -->
+                <div class="scanner-results">
+                    <!-- Summary Stats -->
+                    <div class="scan-summary glass-card" id="scanSummary" style="display: none;">
+                        <div class="summary-stat safe">
+                            <i data-lucide="check-circle-2"></i>
+                            <div class="summary-count" id="summSafe">0</div>
+                            <div class="summary-label">Safe</div>
+                        </div>
+                        <div class="summary-stat suspicious">
+                            <i data-lucide="alert-triangle"></i>
+                            <div class="summary-count" id="summSuspicious">0</div>
+                            <div class="summary-label">Suspicious</div>
+                        </div>
+                        <div class="summary-stat threat">
+                            <i data-lucide="shield-x"></i>
+                            <div class="summary-count" id="summThreats">0</div>
+                            <div class="summary-label">Threats</div>
+                        </div>
+                        <div class="summary-stat total">
+                            <i data-lucide="mails"></i>
+                            <div class="summary-count" id="summTotal">0</div>
+                            <div class="summary-label">Total</div>
+                        </div>
+                    </div>
+
+                    <!-- Email Results List -->
+                    <div id="scanResults" class="scan-results-list">
+                        <div class="empty-state">
+                            <i data-lucide="search" class="empty-icon-svg"></i>
+                            <p>Connect your inbox and click <strong>Scan</strong> to analyze your emails.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ─── Features Section ───────────────────────────────── -->
+        <section class="features-section">
+            <h2 class="features-title">How It <span class="gradient-text">Works</span></h2>
+            <p class="features-subtitle">Enterprise-grade phishing simulation and detection in four pillars</p>
+            <div class="features-grid">
+                <div class="feature-card glass-card">
+                    <div class="feature-icon"><i data-lucide="target"></i></div>
+                    <h3>Emotional Triggers</h3>
+                    <p>Choose from urgency, authority, fear, or reward-based manipulation tactics used in real-world
+                        attacks.</p>
+                </div>
+                <div class="feature-card glass-card">
+                    <div class="feature-icon"><i data-lucide="link-2"></i></div>
+                    <h3>Suspicious Indicators</h3>
+                    <p>Inject realistic phishing indicators: IP-based URLs, typosquatting domains, and double-extension
+                        attachments.</p>
+                </div>
+                <div class="feature-card glass-card">
+                    <div class="feature-icon"><i data-lucide="brain-circuit"></i></div>
+                    <h3>AI-Powered Engine</h3>
+                    <p>Powered by Google Gemini AI with fallback templates — generates unique, context-aware scenarios
+                        every time.</p>
+                </div>
+                <div class="feature-card glass-card">
+                    <div class="feature-icon"><i data-lucide="radar"></i></div>
+                    <h3>Live Inbox Scanner</h3>
+                    <p>Connect via IMAP and let AI analyze every email — intelligently flagging only genuine threats,
+                        not legitimate mail.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ─── Footer ─────────────────────────────────────────── -->
+        <footer class="app-footer">
+            <p class="footer-warning">
+                <i data-lucide="triangle-alert"></i>
+                <strong>Educational &amp; Research Purposes Only</strong> | This tool does not send
+                real malicious content. All generated content is for controlled security awareness training.
+            </p>
+            <p class="footer-credits">AI in Cybersecurity | Muhammad Sohaib (22K-4751) &amp; Zeerak Shahzad (22K-4692)
+            </p>
+            <div class="footer-links">
+                <a href="https://github.com/Gustav1814/Phishing-Gurad-AI" target="_blank">
+                    <i data-lucide="github"></i> Source Code
+                </a>
+            </div>
+        </footer>
+    </div>
 
     <!-- Loading Overlay -->
     <div class="loading-overlay" id="loadingOverlay" style="display: none;">
         <div class="loading-card">
-            <div class="spinner"></div>
-            <p>Generating phishing email...</p>
+            <div class="loading-spinner"></div>
+            <p>Generating phishing email<span class="loading-dots"></span></p>
             <p class="loading-sub">AI is crafting a realistic scenario</p>
         </div>
     </div>
 
+    <!-- Send Email Modal -->
+    <div class="modal-overlay" id="sendModal" style="display: none;">
+        <div class="modal-card glass-card">
+            <div class="modal-header">
+                <div class="modal-title-group">
+                    <i data-lucide="send"></i>
+                    <h3>Send to Real Inbox</h3>
+                </div>
+                <button class="modal-close" onclick="closeSendModal()">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+
+            <div class="modal-warning">
+                <i data-lucide="triangle-alert"></i>
+                <div>
+                    <strong>Educational Use Only</strong> | This sends a simulated phishing email for
+                    security awareness training. A simulation banner is appended.
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">
+                    <i data-lucide="at-sign"></i> Your Email (Sender)
+                </label>
+                <input type="email" id="sendFromEmail" class="form-input" placeholder="you@gmail.com">
+            </div>
+            <div class="form-group">
+                <label class="form-label">
+                    <i data-lucide="key-round"></i> App Password
+                    <a href="https://myaccount.google.com/apppasswords" target="_blank" class="help-link">Get App
+                        Password</a>
+                </label>
+                <input type="password" id="sendFromPassword" class="form-input" placeholder="App-specific password">
+            </div>
+            <div class="form-group">
+                <label class="form-label">
+                    <i data-lucide="mail"></i> Recipient Email
+                </label>
+                <input type="email" id="sendToEmail" class="form-input" placeholder="recipient@example.com">
+            </div>
+            <div class="form-group">
+                <label class="form-label">
+                    <i data-lucide="user"></i> Display Name Override
+                    <span class="label-hint">(optional)</span>
+                </label>
+                <input type="text" id="sendDisplayName" class="form-input" placeholder="e.g. IT Security Team">
+            </div>
+
+            <button class="generate-btn send-modal-btn" id="sendConfirmBtn" onclick="sendGeneratedEmail()">
+                <i data-lucide="rocket" class="btn-icon"></i>
+                <span class="btn-text">Send Email Now</span>
+            </button>
+        </div>
+    </div>
+
     <script src="/static/js/app.js"></script>
+    <script>lucide.createIcons();</script>
 </body>
+
 </html>

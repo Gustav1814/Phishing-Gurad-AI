@@ -10,7 +10,7 @@ AI_PROVIDER = os.getenv("AI_PROVIDER", "fallback").lower()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 # Gemini model
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 
 # Database
 DATABASE_PATH = os.path.join(os.path.dirname(__file__), "phishing_emails.db")
