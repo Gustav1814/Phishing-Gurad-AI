@@ -56,7 +56,10 @@ def init_db():
     conn.close()
 
 
-init_db()
+try:
+    init_db()
+except Exception as e:
+    print(f"[app] DB init warning (non-fatal): {e}")
 
 
 # ─── Routes ─────────────────────────────────────────────────────────────────────
