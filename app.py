@@ -20,7 +20,12 @@ from email_generator import generate_email
 from inbox_scanner import connect_imap, fetch_inbox_emails, analyze_email_with_ai
 from email_sender import send_email
 
-app = Flask(__name__)
+_dir = os.path.dirname(os.path.abspath(__file__))
+app = Flask(
+    __name__,
+    static_folder=os.path.join(_dir, "static"),
+    template_folder=os.path.join(_dir, "templates"),
+)
 app.secret_key = config.SECRET_KEY
 
 
