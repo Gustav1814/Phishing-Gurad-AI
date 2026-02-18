@@ -7,10 +7,15 @@ services:
     startCommand: gunicorn app:app
     envVars:
       - key: AI_PROVIDER
-        value: fallback
+        value: gemini
+      - key: GEMINI_API_KEY
+        sync: false  # Set manually in Render dashboard
+      - key: GEMINI_MODEL
+        value: gemini-2.0-flash
       - key: FLASK_DEBUG
         value: "false"
       - key: SECRET_KEY
         generateValue: true
       - key: PYTHON_VERSION
         value: "3.11.0"
+
