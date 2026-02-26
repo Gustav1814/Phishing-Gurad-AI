@@ -1,0 +1,7 @@
+# Full deps including local model support. Use locally: pip install -r requirements-full.txt
+flask==3.1.0
+google-generativeai==0.8.4
+python-dotenv==1.0.1
+gunicorn==23.0.0
+scikit-learn>=1.3.0
+joblib>=1.3.0

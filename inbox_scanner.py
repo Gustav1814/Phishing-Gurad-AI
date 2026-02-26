@@ -18,9 +18,8 @@ import html
 import re
 import json
 import traceback
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-import google.generativeai as genai
 import config
 
 # Optional in-memory analysis cache (keyed by email fingerprint, TTL from config)
@@ -597,6 +596,7 @@ def analyze_email_with_ai(email_data):
         return result
 
     try:
+        import google.generativeai as genai
         genai.configure(api_key=config.GEMINI_API_KEY)
         model = genai.GenerativeModel(config.GEMINI_MODEL)
 
@@ -766,6 +766,13 @@ Attachments:
     except Exception as e:
         print(f"[inbox_scanner] Gemini analysis error: {e}")
         traceback.print_exc()
+        # When Gemini fails (e.g. quota exceeded), try our trained model first, then rules
+        analysis = _call_trained_local_model(email_data)
+        if analysis:
+            result = _apply_adaptive_and_record(email_data, analysis)
+            if ttl > 0 and cache_key:
+                _analysis_cache[cache_key] = (result, time.time())
+            return result
         result = _apply_adaptive_and_record(email_data, _fallback_analysis(email_data))
         if ttl > 0 and cache_key:
             _analysis_cache[cache_key] = (result, time.time())
