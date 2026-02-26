@@ -73,6 +73,18 @@ CUSTOM_AI_TIMEOUT=30
 
 ---
 
+## Deploy on Vercel (same behavior as local)
+
+1. Connect the repo to Vercel and deploy.
+2. In the project **Environment Variables** set the same as local:
+   - **`AI_PROVIDER`** = `gemini` (then your model when quota exceeded) or `local` (only your model).
+   - **`GEMINI_API_KEY`** = your key (if using Gemini).
+   - **`SECRET_KEY`** = any random string (e.g. for sessions).
+3. Check that the app and model are fine: open **`https://your-app.vercel.app/api/scanner/status`**. You want `local_model_working: true` if you use the trained model.
+4. **Note:** On Vercel, DB and adaptive learning use `/tmp`, so they don’t persist across requests. Scoring, your model, rules, and allowlist work the same; only “learning over time” is per-request.
+
+---
+
 ## Key files
 
 | File | Purpose |
