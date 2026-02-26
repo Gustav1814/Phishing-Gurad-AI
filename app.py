@@ -17,8 +17,13 @@ from indicator_engine import (
     validate_indicators,
 )
 from email_generator import generate_email
-from inbox_scanner import connect_imap, fetch_inbox_emails, analyze_email_with_ai
 from email_sender import send_email
+
+
+def _inbox_scanner():
+    """Lazy import so app can start on Vercel even if scanner deps are slow or fail."""
+    from inbox_scanner import connect_imap, fetch_inbox_emails, analyze_email_with_ai
+    return connect_imap, fetch_inbox_emails, analyze_email_with_ai
 
 try:
     from adaptive_learning import submit_feedback as adaptive_submit_feedback
@@ -96,6 +101,21 @@ try:
     init_db()
 except Exception as e:
     print(f"[app] DB init warning (non-fatal): {e}")
+
+
+# ─── Error handler (avoid 500 crash on Vercel) ──────────────────────────────────
+
+@app.errorhandler(Exception)
+def handle_error(e):
+    """Return JSON 500 instead of crashing the serverless function."""
+    print(f"[app] Unhandled error: {e}")
+    return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/health")
+def api_health():
+    """Lightweight health check; does not load scanner or DB."""
+    return jsonify({"ok": True, "service": "PhishGuard AI"})
 
 
 # ─── Routes ─────────────────────────────────────────────────────────────────────
@@ -479,6 +499,7 @@ def api_inbox_connect():
         if not email_addr or not password:
             return jsonify({"success": False, "error": "Email and password are required"}), 400
 
+        connect_imap, fetch_inbox_emails, _ = _inbox_scanner()
         mail = connect_imap(email_addr, password, imap_server or None)
         emails = fetch_inbox_emails(mail, count=count)
         mail.logout()
@@ -527,6 +548,7 @@ def api_inbox_analyze():
         if not email_data:
             return jsonify({"success": False, "error": "No email data provided"}), 400
 
+        _, _, analyze_email_with_ai = _inbox_scanner()
         analysis = analyze_email_with_ai(email_data)
 
         return jsonify({
@@ -551,6 +573,7 @@ def api_inbox_scan():
         if not email_addr or not password:
             return jsonify({"success": False, "error": "Email and password are required"}), 400
 
+        connect_imap, fetch_inbox_emails, analyze_email_with_ai = _inbox_scanner()
         mail = connect_imap(email_addr, password, imap_server or None)
         if not mail:
             return jsonify({"success": False, "error": "Could not connect to email server. Check your credentials and IMAP settings."}), 500
@@ -614,6 +637,7 @@ def api_inbox_evaluate():
         samples = data.get("samples", [])
         if not samples:
             return jsonify({"success": False, "error": "samples array is required"}), 400
+        _, _, analyze_email_with_ai = _inbox_scanner()
         metrics = scanner_evaluate(samples, analyze_email_with_ai)
         return jsonify({"success": True, "metrics": metrics})
     except Exception as e:
