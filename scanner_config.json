@@ -1,0 +1,5 @@
+{
+  "threshold_phishing": 65,
+  "threshold_suspicious": 40,
+  "threshold_spam": 22
+}

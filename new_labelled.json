@@ -1,0 +1,32 @@
+[
+  {
+    "email_data": {
+      "subject": "Verify your account - action required",
+      "sender_email": "security@paypal-secure.com",
+      "sender_name": "PayPal",
+      "body_text": "Your account may be restricted. Click here to verify your identity.",
+      "links": ["https://bit.ly/verify-now"],
+      "attachments": [],
+      "auth_results": {"spf": "fail", "dkim": "none", "dmarc": "none"},
+      "list_unsubscribe": "",
+      "link_display_pairs": [],
+      "reply_to_email": ""
+    },
+    "label": "THREAT"
+  },
+  {
+    "email_data": {
+      "subject": "Your order has shipped",
+      "sender_email": "ship@amazon.com",
+      "sender_name": "Amazon",
+      "body_text": "Track your package. You requested this email. Unsubscribe from shipping.",
+      "links": ["https://www.amazon.com/gp/order-details"],
+      "attachments": [],
+      "auth_results": {"spf": "pass", "dkim": "pass", "dmarc": "pass"},
+      "list_unsubscribe": "<mailto:unsub@amazon.com>",
+      "link_display_pairs": [],
+      "reply_to_email": ""
+    },
+    "label": "SAFE"
+  }
+]

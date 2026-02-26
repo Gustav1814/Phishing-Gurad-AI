@@ -20,6 +20,37 @@ from email_generator import generate_email
 from inbox_scanner import connect_imap, fetch_inbox_emails, analyze_email_with_ai
 from email_sender import send_email
 
+try:
+    from adaptive_learning import submit_feedback as adaptive_submit_feedback
+except ImportError:
+    adaptive_submit_feedback = None
+
+try:
+    from scanner_evaluation import evaluate as scanner_evaluate
+except ImportError:
+    scanner_evaluate = None
+
+try:
+    from threat_intel import (
+        get_lists as threat_intel_get_lists,
+        get_blocklist_allowlist_counts,
+        add_to_blocklist as threat_intel_add_blocklist,
+        add_to_allowlist as threat_intel_add_allowlist,
+        add_to_allowlist_bulk as threat_intel_add_allowlist_bulk,
+        remove_from_blocklist as threat_intel_remove_blocklist,
+        remove_from_allowlist as threat_intel_remove_allowlist,
+        reload_lists as threat_intel_reload,
+    )
+except ImportError:
+    threat_intel_get_lists = None
+    get_blocklist_allowlist_counts = None
+    threat_intel_add_blocklist = None
+    threat_intel_add_allowlist = None
+    threat_intel_add_allowlist_bulk = None
+    threat_intel_remove_blocklist = None
+    threat_intel_remove_allowlist = None
+    threat_intel_reload = None
+
 _dir = os.path.dirname(os.path.abspath(__file__))
 app = Flask(
     __name__,
@@ -568,6 +599,206 @@ def api_inbox_scan():
 
 
 import imaplib  # For exception handling
+
+
+@app.route("/api/inbox/evaluate", methods=["POST"])
+def api_inbox_evaluate():
+    """
+    Industry-standard accuracy evaluation. Body: { "samples": [ { "email_data": {...}, "true_verdict": "SAFE"|"PHISHING"|"SPAM"|"SUSPICIOUS"|"SCAM" }, ... ] }.
+    Returns binary precision/recall/F1 and per-verdict metrics.
+    """
+    if not scanner_evaluate:
+        return jsonify({"success": False, "error": "Scanner evaluation module not available"}), 501
+    try:
+        data = request.get_json() or {}
+        samples = data.get("samples", [])
+        if not samples:
+            return jsonify({"success": False, "error": "samples array is required"}), 400
+        metrics = scanner_evaluate(samples, analyze_email_with_ai)
+        return jsonify({"success": True, "metrics": metrics})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/scanner/config", methods=["GET", "POST"])
+def api_scanner_config():
+    """GET: return thresholds (dynamic from scanner_config.json). POST: update thresholds (no restart)."""
+    try:
+        import config as cfg
+        if request.method == "POST":
+            from scanner_config_loader import set_thresholds
+            data = request.get_json() or {}
+            p = int(data.get("threshold_phishing", 65))
+            s = int(data.get("threshold_suspicious", 40))
+            sp = int(data.get("threshold_spam", 22))
+            ok = set_thresholds(p, s, sp)
+            return jsonify({"success": ok})
+        try:
+            from scanner_config_loader import get_thresholds
+            thr_p, thr_s, thr_sp = get_thresholds(cfg)
+        except ImportError:
+            thr_p = getattr(cfg, "SCANNER_THRESHOLD_PHISHING", 65)
+            thr_s = getattr(cfg, "SCANNER_THRESHOLD_SUSPICIOUS", 40)
+            thr_sp = getattr(cfg, "SCANNER_THRESHOLD_SPAM", 22)
+        return jsonify({
+            "success": True,
+            "threshold_phishing": thr_p,
+            "threshold_suspicious": thr_s,
+            "threshold_spam": thr_sp,
+            "analysis_cache_ttl_sec": getattr(cfg, "ANALYSIS_CACHE_TTL_SEC", 0),
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/scanner/rules", methods=["GET", "POST"])
+def api_scanner_rules():
+    """GET: return dynamic rule lists. POST: update extra keywords (cred_patterns, urgency, bec_patterns, ...)."""
+    try:
+        if request.method == "POST":
+            from scanner_config_loader import update_rules
+            ok = update_rules(request.get_json() or {})
+            return jsonify({"success": ok})
+        from scanner_config_loader import get_dynamic_rules
+        return jsonify({"success": True, "rules": get_dynamic_rules()})
+    except ImportError:
+        return jsonify({"success": False, "error": "scanner_config_loader not available"}), 501
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/threat-intel", methods=["GET"])
+def api_threat_intel_get():
+    """Get blocklist/allowlist and counts for UI."""
+    if not threat_intel_get_lists:
+        return jsonify({"success": False, "error": "Threat intel not available"}), 501
+    try:
+        blocklist, allowlist = threat_intel_get_lists()
+        bc, ac = get_blocklist_allowlist_counts() if get_blocklist_allowlist_counts else (len(blocklist), len(allowlist))
+        return jsonify({
+            "success": True,
+            "blocklist": blocklist,
+            "allowlist": allowlist,
+            "blocklist_count": bc,
+            "allowlist_count": ac,
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/threat-intel/blocklist", methods=["POST"])
+def api_threat_intel_blocklist_add():
+    """Add domain to blocklist. Body: { "domain": "example.com" }."""
+    if not threat_intel_add_blocklist:
+        return jsonify({"success": False, "error": "Threat intel not available"}), 501
+    try:
+        data = request.get_json() or {}
+        domain = (data.get("domain") or "").strip().lower()
+        if not domain or "@" in domain:
+            return jsonify({"success": False, "error": "Valid domain (e.g. example.com) required"}), 400
+        ok = threat_intel_add_blocklist(domain)
+        return jsonify({"success": True, "added": ok})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/threat-intel/blocklist/remove", methods=["POST"])
+def api_threat_intel_blocklist_remove():
+    """Remove domain from blocklist. Body: { "domain": "example.com" }."""
+    if not threat_intel_remove_blocklist:
+        return jsonify({"success": False, "error": "Threat intel not available"}), 501
+    try:
+        data = request.get_json() or {}
+        domain = (data.get("domain") or "").strip().lower()
+        if not domain:
+            return jsonify({"success": False, "error": "domain required"}), 400
+        ok = threat_intel_remove_blocklist(domain)
+        return jsonify({"success": True, "removed": ok})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/threat-intel/allowlist", methods=["POST"])
+def api_threat_intel_allowlist_add():
+    """Add domain to allowlist. Body: { "domain": "example.com" }."""
+    if not threat_intel_add_allowlist:
+        return jsonify({"success": False, "error": "Threat intel not available"}), 501
+    try:
+        data = request.get_json() or {}
+        domain = (data.get("domain") or "").strip().lower()
+        if not domain or "@" in domain:
+            return jsonify({"success": False, "error": "Valid domain required"}), 400
+        ok = threat_intel_add_allowlist(domain)
+        return jsonify({"success": True, "added": ok})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/threat-intel/allowlist/bulk", methods=["POST"])
+def api_threat_intel_allowlist_bulk():
+    """Add multiple domains to allowlist. Body: { "domains": ["bank.com.pk", "app.gov.pk"] }."""
+    if not threat_intel_add_allowlist_bulk:
+        return jsonify({"success": False, "error": "Threat intel not available"}), 501
+    try:
+        data = request.get_json() or {}
+        domains = data.get("domains") or []
+        if not isinstance(domains, list):
+            domains = [domains] if domains else []
+        added = threat_intel_add_allowlist_bulk(domains)
+        return jsonify({"success": True, "added": added, "domains": domains[:50]})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/threat-intel/allowlist/remove", methods=["POST"])
+def api_threat_intel_allowlist_remove():
+    """Remove domain from allowlist. Body: { "domain": "example.com" }."""
+    if not threat_intel_remove_allowlist:
+        return jsonify({"success": False, "error": "Threat intel not available"}), 501
+    try:
+        data = request.get_json() or {}
+        domain = (data.get("domain") or "").strip().lower()
+        if not domain:
+            return jsonify({"success": False, "error": "domain required"}), 400
+        ok = threat_intel_remove_allowlist(domain)
+        return jsonify({"success": True, "removed": ok})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/threat-intel/reload", methods=["POST"])
+def api_threat_intel_reload():
+    """Reload blocklist/allowlist from disk (e.g. after editing threat_intel.json)."""
+    if not threat_intel_reload:
+        return jsonify({"success": False, "error": "Threat intel not available"}), 501
+    try:
+        threat_intel_reload()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/inbox/feedback", methods=["POST"])
+def api_inbox_feedback():
+    """
+    Submit user correction for a scanned email (dynamic learning).
+    Body: { "email_hash": "<from analysis.adaptive.email_hash>", "correct_verdict": "SAFE"|"PHISHING"|"SPAM"|"SUSPICIOUS"|"SCAM" }.
+    Future scans from the same domain will be nudged by this feedback.
+    """
+    if not adaptive_submit_feedback:
+        return jsonify({"success": False, "error": "Adaptive learning not available"}), 501
+    try:
+        data = request.get_json() or {}
+        email_hash = data.get("email_hash", "").strip()
+        correct_verdict = (data.get("correct_verdict") or "").strip().upper()
+        if not email_hash:
+            return jsonify({"success": False, "error": "email_hash is required"}), 400
+        if correct_verdict not in ("SAFE", "PHISHING", "SPAM", "SUSPICIOUS", "SCAM"):
+            return jsonify({"success": False, "error": "correct_verdict must be one of: SAFE, PHISHING, SPAM, SUSPICIOUS, SCAM"}), 400
+        updated = adaptive_submit_feedback(email_hash, correct_verdict)
+        return jsonify({"success": True, "updated": updated})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 # ─── Send Email API ──────────────────────────────────────────────────────────────
