@@ -3,4 +3,5 @@ __pycache__/
 .env
 phishing_emails.db
 adaptive_learning.db
-*.joblib
+adaptive_model.joblib
+.cursor/

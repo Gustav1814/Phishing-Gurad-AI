@@ -32,9 +32,10 @@ except ImportError:
     _HAS_SKLEARN = False
     np = None
 
-# DB path: same directory as config, separate from main app DB
-_ADAPTIVE_DB = os.path.join(os.path.dirname(__file__), "adaptive_learning.db")
-_MODEL_PATH = os.path.join(os.path.dirname(__file__), "adaptive_model.joblib")
+# DB path: use /tmp on Vercel (read-only filesystem); else project dir
+_IS_SERVERLESS = bool(os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
+_ADAPTIVE_DB = "/tmp/adaptive_learning.db" if _IS_SERVERLESS else os.path.join(os.path.dirname(__file__), "adaptive_learning.db")
+_MODEL_PATH = "/tmp/adaptive_model.joblib" if _IS_SERVERLESS else os.path.join(os.path.dirname(__file__), "adaptive_model.joblib")
 
 # Verdicts considered "threat" for reputation and classifier label
 THREAT_VERDICTS = frozenset({"PHISHING", "SPAM", "SCAM", "SUSPICIOUS"})
