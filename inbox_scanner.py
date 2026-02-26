@@ -942,7 +942,7 @@ def _fallback_analysis(email_data: Dict) -> Dict:
     free_providers = ["gmail.com", "outlook.com", "yahoo.com", "hotmail.com", "aol.com", "icloud.com", "ymail.com", "protonmail.com"]
 
     trusted_domains = [
-        "linkedin.com", "facebookmail.com", "facebook.com", "twitter.com", "x.com",
+        "linkedin.com", "linkedinmail.com", "bounce.linkedin.com", "facebookmail.com", "facebook.com", "twitter.com", "x.com",
         "instagram.com", "pinterest.com", "reddit.com", "tiktok.com",
         "google.com", "microsoft.com", "apple.com", "amazon.com", "amazon.co.uk",
         "github.com", "gitlab.com", "bitbucket.org", "vercel.com", "netlify.com",

@@ -81,7 +81,10 @@ CUSTOM_AI_TIMEOUT=30
    - **`GEMINI_API_KEY`** = your key (if using Gemini).
    - **`SECRET_KEY`** = any random string (e.g. for sessions).
 3. Check that the app and model are fine: open **`https://your-app.vercel.app/api/scanner/status`**. You want `local_model_working: true` if you use the trained model.
-4. **Note:** On Vercel, DB and adaptive learning use `/tmp`, so they don’t persist across requests. Scoring, your model, rules, and allowlist work the same; only “learning over time” is per-request.
+4. **Persistent learning (optional):** By default, adaptive learning uses `/tmp` on Vercel, so scans/feedback don’t persist. To make learning persist across requests:
+   - Add a Postgres DB (e.g. [Vercel Postgres](https://vercel.com/storage/postgres), Supabase, or Neon).
+   - In Vercel env set **`DATABASE_URL`** (or **`POSTGRES_URL`**) to your `postgres://...` URL.
+   - Uncomment **`psycopg2-binary`** in `requirements.txt` and redeploy. Scans and feedback will then be stored in Postgres and domain reputation will build over time.
 
 ---
 

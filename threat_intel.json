@@ -1,6 +1,11 @@
 {
   "blocklist_domains": [],
   "allowlist_domains": [
+    "linkedin.com",
+    "linkedinmail.com",
+    "bounce.linkedin.com",
+    "facebookmail.com",
+    "facebook.com",
     "gamma.app",
     "canva.com",
     "notion.so",
@@ -19,7 +24,6 @@
     "microsoft.com",
     "apple.com",
     "github.com",
-    "linkedin.com",
     "paypal.com",
     "amazon.com",
     "hbl.com",

@@ -22,6 +22,9 @@ CUSTOM_AI_URL = os.getenv("CUSTOM_AI_URL", "").strip()  # e.g. http://localhost:
 CUSTOM_AI_API_KEY = os.getenv("CUSTOM_AI_API_KEY", "").strip()  # optional Bearer token
 CUSTOM_AI_TIMEOUT = max(5, min(120, int(os.getenv("CUSTOM_AI_TIMEOUT", "30"))))
 
+# Optional Postgres for adaptive learning (persistent on Vercel). If set, scans/feedback persist across requests.
+DATABASE_URL = (os.getenv("DATABASE_URL") or os.getenv("POSTGRES_URL") or "").strip()
+
 # Database — use /tmp on serverless (Vercel/Lambda) since project dir is read-only
 IS_SERVERLESS = os.getenv("VERCEL", "") or os.getenv("AWS_LAMBDA_FUNCTION_NAME", "")
 if IS_SERVERLESS:

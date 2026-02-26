@@ -22,6 +22,24 @@ import time
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
+try:
+    from config import DATABASE_URL
+except ImportError:
+    DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("POSTGRES_URL") or ""
+
+# Optional Postgres for persistent learning (Vercel: set DATABASE_URL to a postgres:// URL)
+_USE_POSTGRES = bool(DATABASE_URL and DATABASE_URL.strip().lower().startswith("postgres"))
+_psycopg2 = None
+_RealDictCursor = None
+if _USE_POSTGRES:
+    try:
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        _psycopg2 = psycopg2
+        _RealDictCursor = RealDictCursor
+    except ImportError:
+        _USE_POSTGRES = False
+
 # Optional: online classifier (sklearn); if missing, only domain + similar-prior are used
 try:
     from sklearn.linear_model import SGDClassifier
@@ -42,11 +60,19 @@ THREAT_VERDICTS = frozenset({"PHISHING", "SPAM", "SCAM", "SUSPICIOUS"})
 
 # Trusted domains (subset); used for feature "is_trusted_sender"
 TRUSTED_DOMAINS = frozenset({
-    "linkedin.com", "google.com", "microsoft.com", "apple.com", "amazon.com",
+    "linkedin.com", "linkedinmail.com", "bounce.linkedin.com", "facebook.com", "facebookmail.com",
+    "google.com", "microsoft.com", "apple.com", "amazon.com",
     "github.com", "openai.com", "netflix.com", "paypal.com", "stripe.com",
-    "facebook.com", "twitter.com", "x.com", "instagram.com", "slack.com",
+    "twitter.com", "x.com", "instagram.com", "slack.com",
     "zoom.us", "dropbox.com", "adobe.com", "salesforce.com", "notion.so",
 })
+
+
+def _sql(sql: str) -> str:
+    """Use ? for SQLite, %s for Postgres."""
+    if _USE_POSTGRES and _psycopg2:
+        return sql.replace("?", "%s")
+    return sql
 
 
 def _get_conn() -> sqlite3.Connection:
@@ -55,7 +81,65 @@ def _get_conn() -> sqlite3.Connection:
     return conn
 
 
+def _query(sql: str, params: tuple) -> List[Any]:
+    """Run SELECT; return list of dict-like rows."""
+    if _USE_POSTGRES and _psycopg2 and _RealDictCursor:
+        conn = _psycopg2.connect(DATABASE_URL)
+        try:
+            cur = conn.cursor(cursor_factory=_RealDictCursor)
+            cur.execute(_sql(sql), params)
+            rows = cur.fetchall()
+            return list(rows)
+        finally:
+            conn.close()
+    conn = sqlite3.connect(_ADAPTIVE_DB)
+    conn.row_factory = sqlite3.Row
+    try:
+        cur = conn.execute(sql, params)
+        return cur.fetchall()
+    finally:
+        conn.close()
+
+
+def _execute(sql: str, params: tuple) -> int:
+    """Run INSERT/UPDATE/DDL; return rowcount for writes, 0 for DDL."""
+    if _USE_POSTGRES and _psycopg2:
+        conn = _psycopg2.connect(DATABASE_URL)
+        try:
+            cur = conn.cursor()
+            cur.execute(_sql(sql), params)
+            conn.commit()
+            return cur.rowcount or 0
+        finally:
+            conn.close()
+    conn = sqlite3.connect(_ADAPTIVE_DB)
+    try:
+        cur = conn.execute(sql, params)
+        conn.commit()
+        return cur.rowcount
+    finally:
+        conn.close()
+
+
 def _init_db() -> None:
+    if _USE_POSTGRES and _psycopg2:
+        _execute("""
+            CREATE TABLE IF NOT EXISTS scans (
+                id SERIAL PRIMARY KEY,
+                email_hash TEXT NOT NULL,
+                sender_domain TEXT NOT NULL,
+                link_domains_json TEXT,
+                verdict TEXT NOT NULL,
+                threat_score REAL NOT NULL,
+                user_verdict TEXT,
+                created_at REAL NOT NULL
+            )
+        """, ())
+        # Postgres: CREATE INDEX IF NOT EXISTS supported
+        _execute("CREATE INDEX IF NOT EXISTS idx_scans_domain ON scans(sender_domain)", ())
+        _execute("CREATE INDEX IF NOT EXISTS idx_scans_hash ON scans(email_hash)", ())
+        _execute("CREATE INDEX IF NOT EXISTS idx_scans_created ON scans(created_at)", ())
+        return
     with _get_conn() as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS scans (
@@ -106,12 +190,10 @@ def get_domain_reputation(sender_domain: str) -> Tuple[float, int, int]:
     _init_db()
     if not sender_domain:
         return 0.0, 0, 0
-    with _get_conn() as conn:
-        cur = conn.execute(
-            "SELECT verdict, user_verdict FROM scans WHERE sender_domain = ?",
-            (sender_domain,),
-        )
-        rows = cur.fetchall()
+    rows = _query(
+        "SELECT verdict, user_verdict FROM scans WHERE sender_domain = ?",
+        (sender_domain,),
+    )
     threat_count = 0
     safe_count = 0
     for row in rows:
@@ -138,12 +220,10 @@ def get_similar_past(sender_domain: str, link_domains: List[str], limit: int = 5
     _init_db()
     if not sender_domain:
         return 0.0, 0
-    with _get_conn() as conn:
-        cur = conn.execute(
-            "SELECT threat_score, user_verdict, verdict FROM scans WHERE sender_domain = ? ORDER BY created_at DESC LIMIT ?",
-            (sender_domain, limit),
-        )
-        rows = cur.fetchall()
+    rows = _query(
+        "SELECT threat_score, user_verdict, verdict FROM scans WHERE sender_domain = ? ORDER BY created_at DESC LIMIT ?",
+        (sender_domain, limit),
+    )
     if not rows:
         return 0.0, 0
     # Prefer user_verdict for weighting: if user said threat, use threat_score as-is; if safe, treat as 0
@@ -275,12 +355,11 @@ def record_scan(email_data: Dict[str, Any], analysis: Dict[str, Any]) -> None:
     verdict = (analysis.get("verdict") or "SAFE").strip().upper()
     threat_score = float(analysis.get("threat_score", 0))
 
-    with _get_conn() as conn:
-        conn.execute(
-            """INSERT INTO scans (email_hash, sender_domain, link_domains_json, verdict, threat_score, user_verdict, created_at)
-               VALUES (?, ?, ?, ?, ?, NULL, ?)""",
-            (email_hash, sender_domain, json.dumps(link_domains), verdict, threat_score, time.time()),
-        )
+    _execute(
+        """INSERT INTO scans (email_hash, sender_domain, link_domains_json, verdict, threat_score, user_verdict, created_at)
+           VALUES (?, ?, ?, ?, ?, NULL, ?)""",
+        (email_hash, sender_domain, json.dumps(link_domains), verdict, threat_score, time.time()),
+    )
 
     # Online classifier: partial_fit with this sample (self-supervised: label = current verdict)
     if _HAS_SKLEARN and np is not None:
@@ -309,12 +388,10 @@ def submit_feedback(email_hash: str, correct_verdict: str) -> bool:
     """
     _init_db()
     v = correct_verdict.strip().upper()
-    with _get_conn() as conn:
-        cur = conn.execute(
-            "UPDATE scans SET user_verdict = ? WHERE email_hash = ?",
-            (v, email_hash),
-        )
-        return cur.rowcount > 0
+    return _execute(
+        "UPDATE scans SET user_verdict = ? WHERE email_hash = ?",
+        (v, email_hash),
+    ) > 0
 
 
 def get_adaptive_info(email_data: Dict[str, Any]) -> Dict[str, Any]:

@@ -14,9 +14,10 @@ FEATURE_VERSION = 2
 
 # Trusted domains (same concept as inbox_scanner / adaptive_learning)
 TRUSTED_DOMAINS = frozenset({
-    "linkedin.com", "google.com", "microsoft.com", "apple.com", "amazon.com",
+    "linkedin.com", "linkedinmail.com", "bounce.linkedin.com", "facebook.com", "facebookmail.com",
+    "google.com", "microsoft.com", "apple.com", "amazon.com",
     "github.com", "openai.com", "netflix.com", "paypal.com", "stripe.com",
-    "facebook.com", "twitter.com", "x.com", "instagram.com", "slack.com",
+    "twitter.com", "x.com", "instagram.com", "slack.com",
     "zoom.us", "dropbox.com", "adobe.com", "salesforce.com", "notion.so",
     "gamma.app", "canva.com", "figma.com", "vercel.com", "netlify.com",
     "hubspot.com", "mailchimp.com", "sendgrid.net",
