@@ -407,6 +407,21 @@ def _load_trained_model():
         return None
 
 
+def get_scanner_status() -> Dict[str, Any]:
+    """Return status of scanner: AI provider, local model path, whether file exists and model loads. For deployment checks."""
+    provider = (getattr(config, "AI_PROVIDER", "") or "fallback").lower()
+    path = getattr(config, "TRAINED_MODEL_PATH", "").strip() or os.path.join(os.path.dirname(__file__), "trained_scanner.joblib")
+    file_exists = os.path.isfile(path)
+    model_loaded = _load_trained_model() is not None
+    return {
+        "ai_provider": provider,
+        "local_model_path": path,
+        "local_model_file_exists": file_exists,
+        "local_model_loaded": model_loaded,
+        "local_model_working": file_exists and model_loaded,
+    }
+
+
 def _call_trained_local_model(email_data: Dict) -> Optional[Dict]:
     """
     Run your trained model (no API key, no quota). Uses scanner_features + saved classifier.

@@ -644,6 +644,16 @@ def api_inbox_evaluate():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@app.route("/api/scanner/status")
+def api_scanner_status():
+    """Check if scanner and local model are working (for deployment)."""
+    try:
+        from inbox_scanner import get_scanner_status
+        return jsonify({"success": True, **get_scanner_status()})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e), "ai_provider": getattr(config, "AI_PROVIDER", "?")}), 500
+
+
 @app.route("/api/scanner/config", methods=["GET", "POST"])
 def api_scanner_config():
     """GET: return thresholds (dynamic from scanner_config.json). POST: update thresholds (no restart)."""
