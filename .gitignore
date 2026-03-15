@@ -17,13 +17,13 @@ instance/
 *.db
 data/*.json
 data/*.csv
-models/*.joblib
 adaptive_learning.db
 adaptive_model.joblib
 phishing_emails.db
 training_data.json
 *.joblib
-trained_scanner.joblib
+# Allow the trained scanner for demo/deploy (Render, Vercel)
+!models/trained_scanner.joblib
 
 # IDE / tools
 .cursor/

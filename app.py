@@ -130,6 +130,7 @@ def handle_error(e):
 
 
 @app.route("/api/health")
+@app.route("/healthz")
 def api_health():
     """Lightweight health check; does not load scanner or DB."""
     return jsonify({"ok": True, "service": "PhishGuard AI"})
