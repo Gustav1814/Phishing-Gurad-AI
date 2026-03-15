@@ -1,6 +1,23 @@
 # PhishGuard AI
 
-AI-driven phishing email generator and **inbox scanner** for security awareness training. Generates simulations and analyzes real emails for threats (phishing, BEC, spam, scams). Uses Gemini (optional), your own trained model, or a custom HTTP AI — no API key required for local/custom.
+Phishing email generator and **inbox scanner** for security awareness training. Train on labeled spam/ham CSV; the model runs locally (no API key). Rule-based fallback, configurable thresholds, domain reputation and feedback.
+
+---
+
+## Project layout (production-ready)
+
+```
+Phishing-Gurad-AI/
+  app.py              # Flask entry
+  config.py            # Paths and env
+  requirements.txt
+  config/              # JSON configs (thresholds, rules, blocklist/allowlist)
+  models/              # trained_scanner.joblib (created on train)
+  data/                # training_data.json, CSVs (optional)
+  instance/            # SQLite DBs (created at runtime)
+  templates/
+  static/
+```
 
 ---
 
@@ -8,15 +25,16 @@ AI-driven phishing email generator and **inbox scanner** for security awareness 
 
 ```bash
 pip install -r requirements.txt
+# 1) Convert CSV to training format
+python download_kaggle_spam.py --csv your_emails.csv --output data/training_data.json
+# 2) Train (saves model to models/trained_scanner.joblib)
+python train_and_check.py --data data/training_data.json
+# 3) Run app
 python app.py
 # Open http://localhost:5000
 ```
 
-**Use your own model (no Gemini):**
-
-1. `python train_and_check.py` — trains on `training_data.json`, saves `trained_scanner.joblib`, prints if it’s working.
-2. In `.env` set `AI_PROVIDER=local`.
-3. Restart the app. Scanner uses your model.
+If your files are still in the project root: `python train_and_check.py --data training_data.json` — the model will be saved to `models/`. Scanner uses `models/trained_scanner.joblib` by default (`AI_PROVIDER=local`). No API keys needed.
 
 ---
 
@@ -34,13 +52,15 @@ So: **domain score first**, then **content/attachments** for spam/phishing. Allo
 
 | Goal | Command / action |
 |------|-------------------|
-| Train and check | `python train_and_check.py` |
+| Convert CSV → training JSON | `python download_kaggle_spam.py --csv emails.csv --output training_data.json` |
+| Train and check | `python train_and_check.py --data training_data.json` |
+| Train only (skip 20k-email eval) | `python train_and_check.py --data training_data.json --skip-eval` |
 | Evaluate on labelled data | `python evaluate_accuracy.py --data test_set.json` |
-| Improve | Add more labelled SAFE/THREAT to `training_data.json`, run `train_and_check.py` again |
+| Improve | Add more rows to your CSV (or merge into training_data.json), reconvert, then run `train_and_check.py` again |
 
-- **Data:** Aim for 50+ SAFE and 50+ THREAT (200+ each is better). Real labelled emails improve accuracy most.
-- **Metrics:** F1 &gt; 0.85 is good; use `evaluate_accuracy.py` on a hold-out set. Tune thresholds in `scanner_config.json` or via `POST /api/scanner/config`.
-- **Feedback:** When the scanner is wrong, call the feedback API with the correct verdict so domain reputation and the online learner adapt.
+- **Data:** Supervised learning. Use a CSV with a label column (spam/ham or 0/1). Aim for 50+ SAFE and 50+ THREAT (200+ each is better).
+- **Metrics:** F1 &gt; 0.85 is good; use `evaluate_accuracy.py` on a hold-out set. Tune thresholds in `scanner_config.json` or via `POST /api/scanner/config` (no restart).
+- **Dynamic:** Thresholds and rules are configurable at runtime. Feedback API updates domain reputation so the system improves with use.
 
 ---
 
@@ -48,9 +68,9 @@ So: **domain score first**, then **content/attachments** for spam/phishing. Allo
 
 | What | How |
 |------|-----|
-| **Thresholds** | Edit `scanner_config.json` or `POST /api/scanner/config` with `{ "threshold_phishing": 65, "threshold_suspicious": 40, "threshold_spam": 22 }`. |
-| **Rule keywords** | Edit `scanner_rules.json` or `POST /api/scanner/rules` with `{ "bec_patterns": ["..."], "urgency": ["..."], ... }`. |
-| **Allowlist / blocklist** | Edit `threat_intel.json` or `threat_intel_local.json`; or `POST /api/threat-intel/allowlist` (body `{ "domain": "example.com" }`), `POST /api/threat-intel/allowlist/bulk` (body `{ "domains": ["a.com", "b.com"] }`), `POST /api/threat-intel/blocklist`. Reload: `POST /api/threat-intel/reload`. |
+| **Thresholds** | Edit `config/scanner_config.json` or `POST /api/scanner/config` with `{ "threshold_phishing": 65, "threshold_suspicious": 40, "threshold_spam": 22 }`. |
+| **Rule keywords** | Edit `config/scanner_rules.json` or `POST /api/scanner/rules`. |
+| **Allowlist / blocklist** | Edit `config/threat_intel.json` or `config/threat_intel_local.json`; or use `POST /api/threat-intel/allowlist`, `POST /api/threat-intel/blocklist`. Reload: `POST /api/threat-intel/reload`. |
 
 Model blend (static + online learner) and domain reputation update automatically from scans and feedback.
 
@@ -76,11 +96,10 @@ CUSTOM_AI_TIMEOUT=30
 ## Deploy on Vercel (same behavior as local)
 
 1. Connect the repo to Vercel and deploy.
-2. In the project **Environment Variables** set the same as local:
-   - **`AI_PROVIDER`** = `gemini` (then your model when quota exceeded) or `local` (only your model).
-   - **`GEMINI_API_KEY`** = your key (if using Gemini).
+2. In the project **Environment Variables** set:
+   - **`AI_PROVIDER`** = `local` (use your trained model) or `custom` (use your HTTP AI) or `rules` (rule-based only).
    - **`SECRET_KEY`** = any random string (e.g. for sessions).
-3. Check that the app and model are fine: open **`https://your-app.vercel.app/api/scanner/status`**. You want `local_model_working: true` if you use the trained model.
+3. Check that the app and model are fine: open **`https://your-app.vercel.app/api/scanner/status`**. You want `local_model_working: true` when using the trained model.
 4. **Persistent learning (optional):** By default, adaptive learning uses `/tmp` on Vercel, so scans/feedback don’t persist. To make learning persist across requests:
    - Add a Postgres DB (e.g. [Vercel Postgres](https://vercel.com/storage/postgres), Supabase, or Neon).
    - In Vercel env set **`DATABASE_URL`** (or **`POSTGRES_URL`**) to your `postgres://...` URL.
@@ -90,19 +109,21 @@ CUSTOM_AI_TIMEOUT=30
 
 ## Key files
 
-| File | Purpose |
+| Path | Purpose |
 |------|---------|
 | `app.py` | Flask app, API, UI. |
+| `config.py` | Paths (config/, models/, data/, instance/), env. |
 | `inbox_scanner.py` | Email analysis: local model, rules, adaptive layer. |
-| `adaptive_learning.py` | Domain reputation, similar-past, online learner, feedback. |
+| `adaptive_learning.py` | Domain reputation, online learner, feedback. |
 | `scanner_features.py` | Feature extraction for the trained model. |
-| `train_and_check.py` | One-shot train + test; use this first. |
-| `train_scanner_model.py` | Advanced training (CV, GB, merge data). |
-| `evaluate_accuracy.py` | Measure precision/recall/F1 on labelled JSON. |
-| `scanner_config.json` | Dynamic thresholds. |
-| `scanner_rules.json` | Extra rule keywords (merged with built-in). |
-| `threat_intel.json` | Allowlist/blocklist domains. |
-| `threat_intel_local.json` | Your extra domains (merged). |
+| `download_kaggle_spam.py` | Convert CSV to training JSON. |
+| `train_and_check.py` | One-shot train + test (writes to `models/`). |
+| `train_scanner_model.py` | Advanced training (CV, GB). |
+| `evaluate_accuracy.py` | Precision/recall/F1 on labelled JSON. |
+| `config/scanner_config.json` | Dynamic thresholds. |
+| `config/scanner_rules.json` | Extra rule keywords. |
+| `config/threat_intel.json` | Allowlist/blocklist domains. |
+| `config/threat_intel_local.json` | Your extra domains (merged). |
 
 ---
 

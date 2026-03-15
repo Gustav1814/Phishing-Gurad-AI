@@ -50,10 +50,15 @@ except ImportError:
     _HAS_SKLEARN = False
     np = None
 
-# DB path: use /tmp on Vercel (read-only filesystem); else project dir
+# DB and model paths: /tmp on serverless, else instance/ and models/
 _IS_SERVERLESS = bool(os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
-_ADAPTIVE_DB = "/tmp/adaptive_learning.db" if _IS_SERVERLESS else os.path.join(os.path.dirname(__file__), "adaptive_learning.db")
-_MODEL_PATH = "/tmp/adaptive_model.joblib" if _IS_SERVERLESS else os.path.join(os.path.dirname(__file__), "adaptive_model.joblib")
+try:
+    from config import INSTANCE_DIR, MODELS_DIR
+except ImportError:
+    INSTANCE_DIR = os.path.join(os.path.dirname(__file__), "instance")
+    MODELS_DIR = os.path.join(os.path.dirname(__file__), "models")
+_ADAPTIVE_DB = "/tmp/adaptive_learning.db" if _IS_SERVERLESS else os.path.join(INSTANCE_DIR, "adaptive_learning.db")
+_MODEL_PATH = "/tmp/adaptive_model.joblib" if _IS_SERVERLESS else os.path.join(MODELS_DIR, "adaptive_model.joblib")
 
 # Verdicts considered "threat" for reputation and classifier label
 THREAT_VERDICTS = frozenset({"PHISHING", "SPAM", "SCAM", "SUSPICIOUS"})
@@ -75,50 +80,31 @@ def _sql(sql: str) -> str:
     return sql
 
 
-def _get_conn() -> sqlite3.Connection:
-    conn = sqlite3.connect(_ADAPTIVE_DB)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
 def _query(sql: str, params: tuple) -> List[Any]:
-    """Run SELECT; return list of dict-like rows."""
+    """Run SELECT; return list of dict-like rows. Uses context managers so connections are always closed."""
     if _USE_POSTGRES and _psycopg2 and _RealDictCursor:
-        conn = _psycopg2.connect(DATABASE_URL)
-        try:
-            cur = conn.cursor(cursor_factory=_RealDictCursor)
-            cur.execute(_sql(sql), params)
-            rows = cur.fetchall()
-            return list(rows)
-        finally:
-            conn.close()
-    conn = sqlite3.connect(_ADAPTIVE_DB)
-    conn.row_factory = sqlite3.Row
-    try:
+        with _psycopg2.connect(DATABASE_URL) as conn:
+            with conn.cursor(cursor_factory=_RealDictCursor) as cur:
+                cur.execute(_sql(sql), params)
+                return list(cur.fetchall())
+    with sqlite3.connect(_ADAPTIVE_DB) as conn:
+        conn.row_factory = sqlite3.Row
         cur = conn.execute(sql, params)
         return cur.fetchall()
-    finally:
-        conn.close()
 
 
 def _execute(sql: str, params: tuple) -> int:
-    """Run INSERT/UPDATE/DDL; return rowcount for writes, 0 for DDL."""
+    """Run INSERT/UPDATE/DDL; return rowcount for writes, 0 for DDL. Uses context managers."""
     if _USE_POSTGRES and _psycopg2:
-        conn = _psycopg2.connect(DATABASE_URL)
-        try:
-            cur = conn.cursor()
-            cur.execute(_sql(sql), params)
-            conn.commit()
-            return cur.rowcount or 0
-        finally:
-            conn.close()
-    conn = sqlite3.connect(_ADAPTIVE_DB)
-    try:
+        with _psycopg2.connect(DATABASE_URL) as conn:
+            with conn.cursor() as cur:
+                cur.execute(_sql(sql), params)
+                conn.commit()
+                return cur.rowcount or 0
+    with sqlite3.connect(_ADAPTIVE_DB) as conn:
         cur = conn.execute(sql, params)
         conn.commit()
         return cur.rowcount
-    finally:
-        conn.close()
 
 
 def _init_db() -> None:
@@ -135,12 +121,11 @@ def _init_db() -> None:
                 created_at REAL NOT NULL
             )
         """, ())
-        # Postgres: CREATE INDEX IF NOT EXISTS supported
         _execute("CREATE INDEX IF NOT EXISTS idx_scans_domain ON scans(sender_domain)", ())
         _execute("CREATE INDEX IF NOT EXISTS idx_scans_hash ON scans(email_hash)", ())
         _execute("CREATE INDEX IF NOT EXISTS idx_scans_created ON scans(created_at)", ())
         return
-    with _get_conn() as conn:
+    with sqlite3.connect(_ADAPTIVE_DB) as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS scans (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -156,6 +141,7 @@ def _init_db() -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_domain ON scans(sender_domain)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_hash ON scans(email_hash)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_created ON scans(created_at)")
+        conn.commit()
 
 
 def _email_fingerprint(email_data: Dict[str, Any]) -> str:

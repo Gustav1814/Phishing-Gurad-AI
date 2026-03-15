@@ -1,15 +1,19 @@
 """
 scanner_config_loader.py — Dynamic scanner config (thresholds, no restart).
-Loads from scanner_config.json; falls back to env/config. API can update and persist.
+Loads from config/; falls back to env/config. API can update and persist.
 """
 
 import json
 import os
 from typing import Any, Dict, Tuple
 
-_PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
-_CONFIG_PATH = os.path.join(_PROJECT_DIR, "scanner_config.json")
-_RULES_PATH = os.path.join(_PROJECT_DIR, "scanner_rules.json")
+try:
+    from config import CONFIG_DIR
+except ImportError:
+    CONFIG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config")
+
+_CONFIG_PATH = os.path.join(CONFIG_DIR, "scanner_config.json")
+_RULES_PATH = os.path.join(CONFIG_DIR, "scanner_rules.json")
 
 # In-memory cache; cleared when file is updated via API
 _cached_config: Dict[str, Any] = {}

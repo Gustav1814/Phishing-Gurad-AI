@@ -1,7 +1,33 @@
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+.Python
+*.so
+.venv/
+venv/
+env/
+
+# Env and secrets
 .env
-phishing_emails.db
+.env.local
+
+# Data and artifacts (production dirs)
+instance/
+*.db
+data/*.json
+data/*.csv
+models/*.joblib
 adaptive_learning.db
 adaptive_model.joblib
+phishing_emails.db
+training_data.json
+*.joblib
+trained_scanner.joblib
+
+# IDE / tools
 .cursor/
+.idea/
+*.swp
+*.swo
+.DS_Store

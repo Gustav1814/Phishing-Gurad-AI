@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-evaluate_accuracy.py — Measure real accuracy of your scanner (trained model + rules + adaptive).
+evaluate_accuracy.py — Measure scanner accuracy on labelled data.
 
-Run this on your labelled data to see precision, recall, F1. Use a hold-out set for honest
-estimates (don't train on the same file you evaluate on).
+Runs the full scanner (local model + thresholds; adaptive layer disabled during eval for stable metrics).
+Use a hold-out set for honest estimates.
 
 Usage:
-  python evaluate_accuracy.py --data training_data.json
-  python evaluate_accuracy.py --data test_set.json   # best: use data you did NOT train on
+  python evaluate_accuracy.py --data test_set.json
+  python evaluate_accuracy.py --data training_data.json --limit 500
 """
 
 import argparse
@@ -39,10 +39,7 @@ def main():
     for item in raw:
         email_data = item.get("email_data") or item
         label = (item.get("label") or item.get("verdict") or "SAFE").strip().upper()
-        if label in THREAT_LABELS or label in ("PHISHING", "SPAM", "SCAM", "SUSPICIOUS"):
-            true_verdict = "PHISHING"  # any threat
-        else:
-            true_verdict = "SAFE"
+        true_verdict = "PHISHING" if label in THREAT_LABELS else "SAFE"
         samples.append({"email_data": email_data, "true_verdict": true_verdict})
 
     if args.limit > 0:

@@ -1,18 +1,19 @@
 """
-threat_intel.py — Blocklist/allowlist and threat intelligence for industry-standard filtering.
-
-- Sender domains can be blocklisted (always boost threat) or allowlisted (trusted, reduce threat).
-- Loads from threat_intel.json in the project directory; optional DB table later.
-- Used by inbox_scanner to align with industry practice of maintainable block/allow lists.
+threat_intel.py — Blocklist/allowlist for sender domains.
+Loads from config/; used by inbox_scanner.
 """
 
 import json
 import os
 from typing import List, Optional, Set, Tuple
 
-_THREAT_INTEL_PATH = os.path.join(os.path.dirname(__file__), "threat_intel.json")
-# Optional local override: add domains here (e.g. more Pakistani banks, local apps). Merged with main list.
-_THREAT_INTEL_LOCAL_PATH = os.path.join(os.path.dirname(__file__), "threat_intel_local.json")
+try:
+    from config import CONFIG_DIR
+except ImportError:
+    CONFIG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config")
+
+_THREAT_INTEL_PATH = os.path.join(CONFIG_DIR, "threat_intel.json")
+_THREAT_INTEL_LOCAL_PATH = os.path.join(CONFIG_DIR, "threat_intel_local.json")
 _blocklist: Optional[Set[str]] = None
 _allowlist: Optional[Set[str]] = None
 

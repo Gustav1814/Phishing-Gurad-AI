@@ -8,8 +8,9 @@
     <meta name="description"
         content="AI-driven phishing simulation and detection platform for enterprise security awareness training.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
         rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="stylesheet" href="/static/css/style.css">
@@ -61,7 +62,7 @@
             <div class="hero-content">
                 <div class="hero-badge">
                     <i data-lucide="sparkles"></i>
-                    <span>Powered by Google Gemini AI</span>
+                    <span>Local AI · No API Key</span>
                 </div>
                 <h2 class="hero-title">
                     AI-Driven <span class="gradient-text">Phishing Simulation</span><br>
@@ -92,7 +93,7 @@
         <main class="main-content" id="generator">
             <!-- Left Panel: Configuration -->
             <aside class="config-panel">
-                <div class="panel-card glass-card">
+                <div class="panel-card glass-card card-3d" data-tilt>
                     <div class="panel-header">
                         <div class="panel-icon"><i data-lucide="settings-2"></i></div>
                         <div>
@@ -202,7 +203,7 @@
                 </div>
 
                 <!-- History Panel -->
-                <div class="panel-card glass-card history-panel">
+                <div class="panel-card glass-card card-3d history-panel" data-tilt>
                     <div class="panel-header">
                         <div class="history-header-left">
                             <div class="panel-icon"><i data-lucide="clock"></i></div>
@@ -227,7 +228,7 @@
             <!-- Right Panel: Email Preview -->
             <section class="preview-section">
                 <!-- Toolbar -->
-                <div class="preview-toolbar glass-card">
+                <div class="preview-toolbar glass-card card-3d">
                     <div class="toolbar-left">
                         <i data-lucide="mail-open"></i>
                         <h2>Email Preview</h2>
@@ -253,7 +254,7 @@
                 </div>
 
                 <!-- Email Display -->
-                <div class="email-container glass-card" id="emailContainer">
+                <div class="email-container glass-card card-3d" id="emailContainer">
                     <div class="email-placeholder" id="emailPlaceholder">
                         <i data-lucide="mail-plus" class="placeholder-icon-svg"></i>
                         <h3>No Email Generated</h3>
@@ -285,7 +286,7 @@
                 </div>
 
                 <!-- Phishing Indicators -->
-                <div class="indicators-panel glass-card" id="indicatorsPanel" style="display: none;">
+                <div class="indicators-panel glass-card card-3d" id="indicatorsPanel" style="display: none;">
                     <div class="panel-header">
                         <div class="panel-icon"><i data-lucide="scan-search"></i></div>
                         <div>
@@ -297,11 +298,11 @@
                 </div>
 
                 <!-- AI Analysis Panel -->
-                <div class="ai-analysis-panel glass-card" id="aiAnalysisPanel" style="display: none;">
+                <div class="ai-analysis-panel glass-card card-3d" id="aiAnalysisPanel" style="display: none;">
                     <div class="ai-analysis-header">
                         <div class="ai-analysis-icon"><i data-lucide="brain-circuit"></i></div>
                         <h3 class="ai-analysis-title">AI Threat Intelligence Report</h3>
-                        <span class="ai-analysis-badge" id="aiPoweredBy">Google Gemini AI</span>
+                        <span class="ai-analysis-badge" id="aiPoweredBy">Local Model</span>
                     </div>
 
                     <!-- Threat Score Gauge -->
@@ -343,7 +344,7 @@
 
             <div class="scanner-layout">
                 <!-- Connection Panel -->
-                <div class="scanner-connect glass-card">
+                <div class="scanner-connect glass-card card-3d" data-tilt>
                     <div class="panel-header">
                         <div class="panel-icon"><i data-lucide="lock-keyhole"></i></div>
                         <div>
@@ -453,25 +454,25 @@
             <h2 class="features-title">How It <span class="gradient-text">Works</span></h2>
             <p class="features-subtitle">Enterprise-grade phishing simulation and detection in four pillars</p>
             <div class="features-grid">
-                <div class="feature-card glass-card">
+                <div class="feature-card glass-card card-3d">
                     <div class="feature-icon"><i data-lucide="target"></i></div>
                     <h3>Emotional Triggers</h3>
                     <p>Choose from urgency, authority, fear, or reward-based manipulation tactics used in real-world
                         attacks.</p>
                 </div>
-                <div class="feature-card glass-card">
+                <div class="feature-card glass-card card-3d">
                     <div class="feature-icon"><i data-lucide="link-2"></i></div>
                     <h3>Suspicious Indicators</h3>
                     <p>Inject realistic phishing indicators: IP-based URLs, typosquatting domains, and double-extension
                         attachments.</p>
                 </div>
-                <div class="feature-card glass-card">
+                <div class="feature-card glass-card card-3d">
                     <div class="feature-icon"><i data-lucide="brain-circuit"></i></div>
                     <h3>AI-Powered Engine</h3>
-                    <p>Powered by Google Gemini AI with fallback templates — generates unique, context-aware scenarios
-                        every time.</p>
+                    <p>Local trained model with rule-based fallback — generates unique, context-aware scenarios
+                        every time. No API key required.</p>
                 </div>
-                <div class="feature-card glass-card">
+                <div class="feature-card glass-card card-3d">
                     <div class="feature-icon"><i data-lucide="radar"></i></div>
                     <h3>Live Inbox Scanner</h3>
                     <p>Connect via IMAP and let AI analyze every email — intelligently flagging only genuine threats,
@@ -508,7 +509,7 @@
 
     <!-- Send Email Modal -->
     <div class="modal-overlay" id="sendModal" style="display: none;">
-        <div class="modal-card glass-card">
+        <div class="modal-card glass-card card-3d">
             <div class="modal-header">
                 <div class="modal-title-group">
                     <i data-lucide="send"></i>

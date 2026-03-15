@@ -1,12 +1,16 @@
 """
-AI-Driven Parameterized Phishing Email Generator
-Flask Application — Main Entry Point
+PhishGuard AI — Flask application.
+
+Phishing simulation generator + inbox scanner (local trained model, no API key).
 """
 
+import imaplib
 import json
-import sqlite3
 import os
+import sqlite3
+from contextlib import contextmanager
 from datetime import datetime
+
 from flask import Flask, render_template, request, jsonify
 
 import config
@@ -68,36 +72,49 @@ app.secret_key = config.SECRET_KEY
 # ─── Database Setup ─────────────────────────────────────────────────────────────
 
 def get_db():
+    """Return a new DB connection. Caller must close it or use get_db_cm()."""
     conn = sqlite3.connect(config.DATABASE_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 
-def init_db():
+@contextmanager
+def get_db_cm():
+    """Context manager for DB connections (ensures close on exit)."""
     conn = get_db()
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS email_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            created_at TEXT NOT NULL,
-            emotional_trigger TEXT,
-            context TEXT,
-            attachment_type TEXT,
-            link_type TEXT,
-            subject TEXT,
-            body_html TEXT,
-            sender_name TEXT,
-            sender_email TEXT,
-            attachment_filename TEXT,
-            suspicious_url TEXT,
-            display_text TEXT,
-            indicators_json TEXT
-        )
-    """)
-    conn.commit()
-    conn.close()
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+def init_db():
+    with get_db_cm() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS email_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                emotional_trigger TEXT,
+                context TEXT,
+                attachment_type TEXT,
+                link_type TEXT,
+                subject TEXT,
+                body_html TEXT,
+                sender_name TEXT,
+                sender_email TEXT,
+                attachment_filename TEXT,
+                suspicious_url TEXT,
+                display_text TEXT,
+                indicators_json TEXT
+            )
+        """)
+        conn.commit()
 
 
 try:
+    import config as _cfg
+    if getattr(_cfg, "ensure_dirs", None):
+        _cfg.ensure_dirs()
     init_db()
 except Exception as e:
     print(f"[app] DB init warning (non-fatal): {e}")
@@ -166,31 +183,30 @@ def api_generate():
         )
 
         # Step 6: Save to history
-        conn = get_db()
-        conn.execute(
-            """INSERT INTO email_history
-               (created_at, emotional_trigger, context, attachment_type, link_type,
-                subject, body_html, sender_name, sender_email,
-                attachment_filename, suspicious_url, display_text, indicators_json)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                datetime.now().isoformat(),
-                emotional_trigger,
-                context_dept,
-                attachment_type,
-                link_type,
-                email_data.get("subject", ""),
-                email_data.get("body_html", ""),
-                email_data.get("sender_name", ""),
-                email_data.get("sender_email", ""),
-                attachment_filename or "",
-                suspicious_url or "",
-                display_text or "",
-                json.dumps(indicators),
-            ),
-        )
-        conn.commit()
-        conn.close()
+        with get_db_cm() as conn:
+            conn.execute(
+                """INSERT INTO email_history
+                   (created_at, emotional_trigger, context, attachment_type, link_type,
+                    subject, body_html, sender_name, sender_email,
+                    attachment_filename, suspicious_url, display_text, indicators_json)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    datetime.now().isoformat(),
+                    emotional_trigger,
+                    context_dept,
+                    attachment_type,
+                    link_type,
+                    email_data.get("subject", ""),
+                    email_data.get("body_html", ""),
+                    email_data.get("sender_name", ""),
+                    email_data.get("sender_email", ""),
+                    attachment_filename or "",
+                    suspicious_url or "",
+                    display_text or "",
+                    json.dumps(indicators),
+                ),
+            )
+            conn.commit()
 
         return jsonify({
             "success": True,
@@ -274,7 +290,7 @@ def api_export(email_id):
 
 @app.route("/api/analyze", methods=["POST"])
 def api_analyze():
-    """AI-powered phishing email analyzer — uses Gemini to provide detailed threat analysis."""
+    """Phishing email analyzer using the same pipeline as inbox scanner (local model + rules)."""
     try:
         data = request.get_json()
         email_subject = data.get("subject", "")
@@ -284,203 +300,68 @@ def api_analyze():
         if not email_body:
             return jsonify({"success": False, "error": "No email content to analyze"}), 400
 
-        # Try AI-powered analysis first
-        provider = config.AI_PROVIDER
-        if provider == "gemini" and config.GEMINI_API_KEY:
-            try:
-                import google.generativeai as genai
-                genai.configure(api_key=config.GEMINI_API_KEY)
-                model = genai.GenerativeModel(config.GEMINI_MODEL)
-
-                prompt = f"""You are an expert cybersecurity analyst specializing in phishing email detection.
-
-Analyze this email and provide a structured threat assessment.
-
-**Email Subject:** {email_subject}
-**Sender:** {sender_email}
-**Email Body (HTML):** {email_body}
-
-Respond with ONLY valid JSON in this exact format:
-{{
-    "threat_score": <number 1-100>,
-    "threat_level": "<LOW|MEDIUM|HIGH|CRITICAL>",
-    "summary": "<1-2 sentence summary of the threat>",
-    "red_flags": [
-        {{
-            "flag": "<name of the red flag>",
-            "description": "<detailed explanation>",
-            "severity": "<low|medium|high|critical>"
-        }}
-    ],
-    "social_engineering_tactics": ["<tactic 1>", "<tactic 2>"],
-    "recommendation": "<what an employee should do if they receive this>"
-}}"""
-
-                response = model.generate_content(prompt)
-                text = response.text.strip()
-                if text.startswith("```"):
-                    text = text.split("\n", 1)[1]
-                    text = text.rsplit("```", 1)[0]
-                analysis = json.loads(text)
-
-                return jsonify({
-                    "success": True,
-                    "analysis": analysis,
-                    "powered_by": "Google Gemini AI",
-                })
-
-            except Exception as e:
-                print(f"[analyzer] Gemini error: {e}, falling back to rule-based")
-
-        # Rule-based fallback analysis
         import re
-        body_text = re.sub(r'<[^>]+>', '', email_body).lower()
-
-        red_flags = []
-        threat_score = 20  # base
-
-        # Check for urgency words
-        urgency_words = ["urgent", "immediately", "expires", "deadline", "within 24 hours", "act now", "time-sensitive", "asap"]
-        found_urgency = [w for w in urgency_words if w in body_text]
-        if found_urgency:
-            red_flags.append({
-                "flag": "Urgency Language",
-                "description": f"Email uses high-pressure words: {', '.join(found_urgency)}. Attackers create false urgency to bypass critical thinking.",
-                "severity": "high",
-            })
-            threat_score += 15
-
-        # Check for authority impersonation
-        authority_words = ["ceo", "cfo", "director", "administrator", "compliance", "mandatory", "required by policy", "chief"]
-        found_authority = [w for w in authority_words if w in body_text]
-        if found_authority:
-            red_flags.append({
-                "flag": "Authority Impersonation",
-                "description": f"Email impersonates authority figures using terms: {', '.join(found_authority)}.",
-                "severity": "high",
-            })
-            threat_score += 15
-
-        # Check for fear tactics
-        fear_words = ["suspended", "terminated", "breach", "compromised", "unauthorized", "violation", "permanently"]
-        found_fear = [w for w in fear_words if w in body_text]
-        if found_fear:
-            red_flags.append({
-                "flag": "Fear-Based Manipulation",
-                "description": f"Email uses threatening language: {', '.join(found_fear)}.",
-                "severity": "critical",
-            })
-            threat_score += 20
-
-        # Check for suspicious links
+        body_text = re.sub(r"<[^>]+>", "", email_body)
         links = re.findall(r'href=["\']([^"\']+)["\']', email_body)
-        suspicious_links = [l for l in links if any(x in l for x in ["http://", "bit.ly", "tinyurl", "192.168", "10.0.0", "172.16"])]
-        if suspicious_links:
-            red_flags.append({
-                "flag": "Suspicious Links Detected",
-                "description": f"Found {len(suspicious_links)} suspicious link(s) using IP addresses, URL shorteners, or unencrypted HTTP.",
-                "severity": "critical",
-            })
-            threat_score += 20
-
-        # Check for suspicious file references
-        suspicious_exts = [".exe", ".scr", ".bat", ".com", ".docm", ".xlsm", ".zip", ".rar", ".7z"]
-        found_files = [ext for ext in suspicious_exts if ext in body_text]
-        if found_files:
-            red_flags.append({
-                "flag": "Suspicious Attachments",
-                "description": f"Email references files with dangerous extensions: {', '.join(found_files)}.",
-                "severity": "critical",
-            })
-            threat_score += 15
-
-        # Check for reward/too-good-to-be-true
-        reward_words = ["bonus", "gift card", "reward", "congratulations", "prize", "promotion", "exclusive"]
-        found_reward = [w for w in reward_words if w in body_text]
-        if found_reward:
-            red_flags.append({
-                "flag": "Reward-Based Lure",
-                "description": f"Email promises enticing rewards: {', '.join(found_reward)}. Common social engineering tactic.",
-                "severity": "medium",
-            })
-            threat_score += 10
-
-        # Spoofed sender check
-        if sender_email and "@company.com" in sender_email:
-            red_flags.append({
-                "flag": "Potentially Spoofed Sender",
-                "description": f"Sender '{sender_email}' uses a generic company domain that could be spoofed.",
-                "severity": "medium",
-            })
-            threat_score += 5
-
-        threat_score = min(threat_score, 100)
-
-        if threat_score >= 80:
-            threat_level = "CRITICAL"
-        elif threat_score >= 60:
-            threat_level = "HIGH"
-        elif threat_score >= 40:
-            threat_level = "MEDIUM"
-        else:
-            threat_level = "LOW"
-
-        tactics = []
-        if found_urgency:
-            tactics.append("False Urgency")
-        if found_authority:
-            tactics.append("Authority Impersonation")
-        if found_fear:
-            tactics.append("Fear Induction")
-        if found_reward:
-            tactics.append("Reward-Based Luring")
-        if suspicious_links:
-            tactics.append("Credential Harvesting via Fake Links")
-        if found_files:
-            tactics.append("Malware Delivery via Attachments")
-
-        analysis = {
-            "threat_score": threat_score,
-            "threat_level": threat_level,
-            "summary": f"This email exhibits {len(red_flags)} phishing indicator(s) with a threat score of {threat_score}/100. "
-                       f"Primary tactics include {', '.join(tactics[:3]) if tactics else 'social engineering'}.",
-            "red_flags": red_flags,
-            "social_engineering_tactics": tactics,
-            "recommendation": "Do NOT click any links or download attachments. Report this email to your IT security team. Verify the sender through a separate communication channel.",
+        email_data = {
+            "subject": email_subject,
+            "sender_email": sender_email or "",
+            "sender_name": "",
+            "body_text": body_text,
+            "body_html": email_body,
+            "links": links,
+            "attachments": [],
+            "attachment_details": [],
+            "link_display_pairs": [],
+            "auth_results": {},
+            "reply_to_email": "",
+            "list_unsubscribe": "",
         }
-
-        return jsonify({
-            "success": True,
-            "analysis": analysis,
-            "powered_by": "Rule-Based Engine" if provider != "gemini" else "Rule-Based Fallback (set GEMINI_API_KEY for AI analysis)",
-        })
-
+        _, _, analyze_email_with_ai = _inbox_scanner()
+        scan = analyze_email_with_ai(email_data)
+        risk = (scan.get("risk_level") or "low").upper()
+        threat_level = "CRITICAL" if risk == "CRITICAL" else "HIGH" if risk == "HIGH" else "MEDIUM" if risk == "MEDIUM" else "LOW"
+        red_flags = [
+            {"flag": f.get("flag"), "description": f.get("explanation", ""), "severity": f.get("severity", "medium")}
+            for f in scan.get("red_flags", [])
+        ]
+        analysis = {
+            "threat_score": scan.get("threat_score", 0),
+            "threat_level": threat_level,
+            "summary": scan.get("summary", ""),
+            "red_flags": red_flags,
+            "social_engineering_tactics": [f.get("flag", "") for f in scan.get("red_flags", []) if f.get("flag")],
+            "recommendation": scan.get("recommendation", ""),
+        }
+        powered_by = "Local trained model" if scan.get("ai_powered") else "Rule-based engine"
+        return jsonify({"success": True, "analysis": analysis, "powered_by": powered_by})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
 
 @app.route("/api/provider")
 def api_provider():
-    """Return the current AI provider configuration."""
-    provider = config.AI_PROVIDER
-    has_key = bool(config.GEMINI_API_KEY)
-
-    if provider == "gemini" and has_key:
-        status = "ai_active"
-        label = f"Google Gemini ({config.GEMINI_MODEL})"
-    elif provider == "gemini" and not has_key:
-        status = "ai_no_key"
-        label = "Gemini (No API Key — Using Fallback Templates)"
+    """Return the current AI provider configuration (local model, custom HTTP, or rules)."""
+    try:
+        from inbox_scanner import get_scanner_status
+        st = get_scanner_status()
+    except Exception:
+        st = {}
+    provider = (config.AI_PROVIDER or "local").lower()
+    local_working = st.get("local_model_working", False)
+    if provider == "local" and local_working:
+        status, label = "ai_active", "Local trained model"
+    elif provider == "custom":
+        status, label = "ai_active", "Custom HTTP AI"
+    elif provider == "local":
+        status, label = "rules", "Local model (not loaded — using rules). Train with train_and_check.py"
     else:
-        status = "fallback"
-        label = "Template Engine (No AI)"
-
+        status, label = "rules", "Rule-based engine"
     return jsonify({
         "success": True,
         "provider": provider,
         "status": status,
         "label": label,
-        "has_key": has_key,
     })
 
 
@@ -619,9 +500,6 @@ def api_inbox_scan():
         return jsonify({"success": False, "error": f"IMAP error: {error_msg}"}), 500
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
-
-
-import imaplib  # For exception handling
 
 
 @app.route("/api/inbox/evaluate", methods=["POST"])
@@ -883,9 +761,8 @@ def api_send_email():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     print("\n" + "=" * 60)
-    print("  AI Phishing Email Generator — Security Awareness Training")
-    print(f"  Running at: http://127.0.0.1:{port}")
-    print(f"  AI Provider: {config.AI_PROVIDER.upper()}")
-    print("  100% FREE — No paid API keys required")
+    print("  PhishGuard AI — Threat Intelligence Platform")
+    print(f"  http://127.0.0.1:{port}")
+    print(f"  Provider: {config.AI_PROVIDER} (local = trained model, no API key)")
     print("=" * 60 + "\n")
     app.run(debug=config.DEBUG, host="0.0.0.0", port=port)

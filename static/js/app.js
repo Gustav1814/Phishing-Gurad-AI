@@ -16,10 +16,33 @@ let emailCount = 0;
 document.addEventListener('DOMContentLoaded', () => {
     initTriggerButtons();
     initParticles();
+    init3DTilt();
     loadHistory();
     animateStatCounter();
     checkAIProvider();
 });
+
+// ─── 3D Tilt on mouse (cards with data-tilt) ─────────────────────────────────────
+function init3DTilt() {
+    const cards = document.querySelectorAll('.card-3d[data-tilt]');
+    const tiltMax = 8; // degrees
+
+    cards.forEach(card => {
+        card.addEventListener('mousemove', (e) => {
+            const rect = card.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / rect.width;
+            const y = (e.clientY - rect.top) / rect.height;
+            const tiltY = (x - 0.5) * 2 * tiltMax;
+            const tiltX = (y - 0.5) * -2 * tiltMax;
+            card.style.setProperty('--tilt-x', tiltX + 'deg');
+            card.style.setProperty('--tilt-y', tiltY + 'deg');
+        });
+        card.addEventListener('mouseleave', () => {
+            card.style.setProperty('--tilt-x', '0deg');
+            card.style.setProperty('--tilt-y', '0deg');
+        });
+    });
+}
 
 // ─── Particle Network Animation ─────────────────────────────────────────────────
 function initParticles() {
@@ -331,19 +354,19 @@ function renderEmailPreview(email) {
 function toggleRedFlags() {
     const toggle = document.getElementById('redFlagToggle');
     const body = document.getElementById('emailBody');
-    const analysisPanel = document.getElementById('analysisPanel');
+    const indicatorsPanel = document.getElementById('indicatorsPanel');
 
     redFlagsActive = toggle.checked;
 
     if (redFlagsActive) {
         body.classList.add('red-flags-active');
-        if (currentIndicators.length > 0) {
-            analysisPanel.style.display = 'block';
+        if (currentIndicators.length > 0 && indicatorsPanel) {
+            indicatorsPanel.style.display = 'block';
             showToast('Red flag analysis enabled — hover over highlighted areas', 'warning');
         }
     } else {
         body.classList.remove('red-flags-active');
-        analysisPanel.style.display = 'none';
+        if (indicatorsPanel) indicatorsPanel.style.display = 'none';
     }
 }
 

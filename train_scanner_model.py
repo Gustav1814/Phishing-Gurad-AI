@@ -45,10 +45,7 @@ def load_json_data(path: str) -> List[Tuple[Dict, int]]:
     for item in raw:
         email_data = item.get("email_data") or item
         label_str = (item.get("label") or item.get("verdict") or "SAFE").strip().upper()
-        if label_str in THREAT_LABELS or label_str in ("PHISHING", "SPAM", "SCAM", "SUSPICIOUS"):
-            label = 1
-        else:
-            label = 0
+        label = 1 if label_str in THREAT_LABELS else 0
         # Ensure minimal keys for feature extraction
         if isinstance(email_data, dict):
             email_data.setdefault("links", [])

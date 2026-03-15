@@ -7,25 +7,25 @@
 
 /* ─── CSS Custom Properties ───────────────────────────────────────────── */
 :root {
-    /* Backgrounds */
-    --bg-void: #050816;
-    --bg-deep: #0a0f1e;
-    --bg-primary: #0d1224;
-    --bg-card: rgba(15, 23, 42, 0.75);
-    --bg-card-solid: #0f172a;
-    --bg-elevated: rgba(22, 33, 62, 0.6);
-    --bg-input: rgba(15, 23, 42, 0.9);
-    --bg-hover: rgba(30, 41, 72, 0.5);
+    /* Backgrounds — deeper dark */
+    --bg-void: #030712;
+    --bg-deep: #060b14;
+    --bg-primary: #0a0f1c;
+    --bg-card: rgba(12, 18, 32, 0.8);
+    --bg-card-solid: #0c1220;
+    --bg-elevated: rgba(18, 28, 48, 0.65);
+    --bg-input: rgba(12, 18, 32, 0.95);
+    --bg-hover: rgba(30, 45, 75, 0.4);
 
     /* Glass */
-    --glass-bg: rgba(15, 23, 42, 0.55);
-    --glass-border: rgba(99, 179, 237, 0.12);
-    --glass-blur: blur(20px);
+    --glass-bg: rgba(12, 18, 32, 0.6);
+    --glass-border: rgba(96, 165, 250, 0.1);
+    --glass-blur: blur(24px);
 
     /* Borders */
-    --border: rgba(99, 115, 150, 0.15);
-    --border-glow: rgba(56, 189, 248, 0.3);
-    --border-accent: rgba(59, 130, 246, 0.4);
+    --border: rgba(71, 85, 105, 0.2);
+    --border-glow: rgba(56, 189, 248, 0.35);
+    --border-accent: rgba(59, 130, 246, 0.5);
 
     /* Text */
     --text-primary: #e2e8f0;
@@ -41,9 +41,13 @@
     --neon-cyan: #22d3ee;
     --neon-blue: #3b82f6;
     --neon-purple: #8b5cf6;
-    --gradient-accent: linear-gradient(135deg, #3b82f6, #8b5cf6, #ec4899);
-    --gradient-btn: linear-gradient(135deg, #0ea5e9, #3b82f6, #8b5cf6);
-    --gradient-glow: linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(139, 92, 246, 0.15));
+    --gradient-accent: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);
+    --gradient-btn: linear-gradient(135deg, #0ea5e9, #6366f1, #8b5cf6);
+    --gradient-glow: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(139, 92, 246, 0.12));
+    /* Animated gradient mesh */
+    --gradient-mesh-1: radial-gradient(ellipse 80% 50% at 20% 20%, rgba(59, 130, 246, 0.18), transparent 50%);
+    --gradient-mesh-2: radial-gradient(ellipse 60% 80% at 80% 80%, rgba(139, 92, 246, 0.15), transparent 50%);
+    --gradient-mesh-3: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(236, 72, 153, 0.06), transparent 60%);
 
     /* Severity */
     --danger: #ef4444;
@@ -107,12 +111,75 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
+/* ─── App wrapper: 3D context + animated gradient mesh ───────────────────── */
+.app-wrapper {
+    position: relative;
+    min-height: 100vh;
+    perspective: var(--perspective);
+    transform-style: preserve-3d;
+}
+
+.app-wrapper::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background:
+        var(--gradient-mesh-1),
+        var(--gradient-mesh-2),
+        var(--gradient-mesh-3),
+        var(--bg-void);
+    background-size: 100% 100%;
+    animation: gradientShift 18s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes gradientShift {
+    0%, 100% { opacity: 1; filter: hue-rotate(0deg); }
+    33% { opacity: 0.98; }
+    66% { opacity: 1; }
+}
+
 /* ─── Particle Canvas ─────────────────────────────────────────────────── */
 #particleCanvas {
     position: fixed;
     inset: 0;
     z-index: 0;
     pointer-events: none;
+}
+
+/* ─── Ambient 3D orbs (floating gradient blobs) ─────────────────────────── */
+.ambient-orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(80px);
+    pointer-events: none;
+    z-index: 0;
+    animation: orbFloat3d 22s ease-in-out infinite;
+}
+.orb-1 {
+    width:  clamp(320px, 50vw, 520px);
+    height: clamp(320px, 50vw, 520px);
+    background: radial-gradient(circle, rgba(59, 130, 246, 0.2) 0%, rgba(139, 92, 246, 0.08) 40%, transparent 70%);
+    top: -15%;
+    left: -10%;
+    transform: translateZ(-100px);
+    animation-delay: 0s;
+}
+.orb-2 {
+    width:  clamp(280px, 45vw, 480px);
+    height: clamp(280px, 45vw, 480px);
+    background: radial-gradient(circle, rgba(139, 92, 246, 0.18) 0%, rgba(236, 72, 153, 0.06) 45%, transparent 70%);
+    bottom: -20%;
+    right: -8%;
+    transform: translateZ(-80px);
+    animation-delay: -11s;
+}
+@keyframes orbFloat3d {
+    0%, 100% { transform: translate(0, 0) translateZ(-100px) scale(1); }
+    25% { transform: translate(40px, -30px) translateZ(-80px) scale(1.08); }
+    50% { transform: translate(-30px, 25px) translateZ(-120px) scale(0.95); }
+    75% { transform: translate(25px, 35px) translateZ(-90px) scale(1.03); }
 }
 
 /* ─── Ambient Glow Backgrounds ────────────────────────────────────────── */
@@ -193,11 +260,12 @@ body {
     position: sticky;
     top: 0;
     z-index: 100;
-    background: rgba(5, 8, 22, 0.8);
-    backdrop-filter: blur(24px) saturate(1.5);
-    -webkit-backdrop-filter: blur(24px) saturate(1.5);
+    background: rgba(3, 7, 18, 0.85);
+    backdrop-filter: blur(24px) saturate(1.4);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
     border-bottom: 1px solid var(--glass-border);
     padding: 0 32px;
+    box-shadow: 0 1px 0 rgba(96, 165, 250, 0.06);
 }
 
 .header-content {
@@ -341,13 +409,20 @@ body {
     animation: pulseDot 2s ease-in-out infinite;
 }
 
-/* ─── Hero Section ────────────────────────────────────────────────────── */
+/* ─── Hero Section (3D depth + gradient) ────────────────────────────────── */
 .hero-section {
     position: relative;
     text-align: center;
     padding: 56px 32px 40px;
     max-width: 900px;
     margin: 0 auto;
+    transform-style: preserve-3d;
+}
+
+.hero-content {
+    transform: translateZ(20px);
+    position: relative;
+    z-index: 1;
 }
 
 .hero-title {
@@ -359,12 +434,12 @@ body {
 }
 
 .hero-title .gradient-text {
-    background: var(--gradient-accent);
+    background: linear-gradient(120deg, #38bdf8 0%, #818cf8 35%, #a78bfa 65%, #ec4899 100%);
+    background-size: 200% auto;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    background-size: 200% auto;
-    animation: shimmerText 4s linear infinite;
+    animation: shimmerText 5s ease-in-out infinite;
 }
 
 .hero-subtitle {
@@ -418,7 +493,7 @@ body {
     min-height: calc(100vh - 72px - 300px);
 }
 
-/* ─── Glass Card (shared) ─────────────────────────────────────────────── */
+/* ─── Glass Card (shared) + 3D ─────────────────────────────────────────── */
 .glass-card {
     background: var(--glass-bg);
     backdrop-filter: var(--glass-blur);
@@ -426,12 +501,24 @@ body {
     border: 1px solid var(--glass-border);
     border-radius: var(--radius);
     box-shadow: var(--shadow), var(--shadow-neon);
-    transition: border-color var(--transition), box-shadow var(--transition);
+    transition: border-color var(--transition), box-shadow var(--transition), transform 0.4s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 
 .glass-card:hover {
-    border-color: rgba(56, 189, 248, 0.2);
-    box-shadow: var(--shadow-lg), var(--shadow-neon);
+    border-color: rgba(56, 189, 248, 0.25);
+    box-shadow: var(--shadow-lg), 0 0 40px rgba(56, 189, 248, 0.06), 0 0 80px rgba(139, 92, 246, 0.04);
+}
+
+/* 3D card: perspective + subtle tilt on hover */
+.card-3d {
+    transform-style: preserve-3d;
+    transform: perspective(var(--perspective)) rotateX(0) rotateY(0);
+    transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.3, 1), box-shadow 0.5s ease, border-color 0.3s ease;
+}
+
+.card-3d:hover {
+    transform: perspective(var(--perspective)) rotateX(var(--tilt-x, 0)) rotateY(var(--tilt-y, 0)) translateZ(8px);
+    box-shadow: var(--shadow-lg), 0 20px 60px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(96, 165, 250, 0.08);
 }
 
 /* ─── Control Panel (Left) ────────────────────────────────────────────── */
@@ -1441,6 +1528,27 @@ body {
     text-align: center;
     box-shadow: var(--shadow-lg), var(--shadow-neon);
     animation: loadingPulse 2s ease-in-out infinite;
+    position: relative;
+    overflow: hidden;
+}
+.loading-card::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    padding: 2px;
+    background: linear-gradient(135deg, #38bdf8, #8b5cf6, #ec4899, #38bdf8);
+    background-size: 300% 300%;
+    animation: gradientRotate 3s ease infinite;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+}
+@keyframes gradientRotate {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
 }
 
 @keyframes loadingPulse {
@@ -1561,12 +1669,13 @@ body {
 
 .feature-card {
     padding: 28px;
-    transition: all var(--transition);
+    transition: all 0.45s cubic-bezier(0.2, 0.8, 0.3, 1);
+    transform-style: preserve-3d;
 }
 
 .feature-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-lg), 0 0 40px rgba(56, 189, 248, 0.08);
+    transform: translateY(-8px) translateZ(12px) rotateX(2deg);
+    box-shadow: var(--shadow-lg), 0 24px 48px rgba(0, 0, 0, 0.35), 0 0 60px rgba(56, 189, 248, 0.08);
 }
 
 .feature-icon {
@@ -3236,12 +3345,12 @@ body {
 }
 
 .gradient-text {
-    background: linear-gradient(135deg, #3b82f6, #8b5cf6, #ec4899);
+    background: linear-gradient(120deg, #38bdf8, #818cf8, #a78bfa, #ec4899);
+    background-size: 200% auto;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    background-size: 200% auto;
-    animation: shimmerText 4s linear infinite;
+    animation: shimmerText 5s ease-in-out infinite;
 }
 
 .glass-card { transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1); }

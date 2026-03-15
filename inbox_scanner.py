@@ -1,7 +1,9 @@
 """
-inbox_scanner.py — Full-Spectrum Adaptive AI Email Threat Analyzer
-Connects to IMAP and uses Google Gemini AI for real-time classification of
-phishing, scams, spam, BEC, malware delivery, impersonation, and social engineering.
+inbox_scanner.py — Industry-standard adaptive email threat analyzer.
+
+Pipeline: (1) Local trained model (AI_PROVIDER=local), (2) Optional custom HTTP AI
+(AI_PROVIDER=custom), (3) Rule-based fallback. No external cloud API required.
+Connects to IMAP; classifies phishing, BEC, spam, scams, malware, impersonation.
 """
 
 import imaplib
@@ -379,7 +381,8 @@ def fetch_inbox_emails(mail, folder="INBOX", count=10):
                 if isinstance(response_part, tuple):
                     msg = email.message_from_bytes(response_part[1])
                     content = extract_email_content(msg)
-                    content["id"] = e_id.decode()
+                    uid = e_id.decode() if isinstance(e_id, bytes) else str(e_id)
+                    content["id"] = content["uid"] = uid
                     email_list.append(content)
         
         return email_list
@@ -409,7 +412,7 @@ def _load_trained_model():
 
 def get_scanner_status() -> Dict[str, Any]:
     """Return status of scanner: AI provider, local model path, whether file exists and model loads. For deployment checks."""
-    provider = (getattr(config, "AI_PROVIDER", "") or "fallback").lower()
+    provider = (getattr(config, "AI_PROVIDER", "") or "local").lower()
     path = getattr(config, "TRAINED_MODEL_PATH", "").strip() or os.path.join(os.path.dirname(__file__), "trained_scanner.joblib")
     file_exists = os.path.isfile(path)
     model_loaded = _load_trained_model() is not None
@@ -450,7 +453,12 @@ def _call_trained_local_model(email_data: Dict) -> Optional[Dict]:
     X = np.array([features], dtype=np.float64)
     if hasattr(model, "predict_proba"):
         proba = model.predict_proba(X)[0]
-        threat_prob = float(proba[1]) if len(proba) > 1 else float(proba[0])
+        # Use model.classes_ so we get P(THREAT) even if classes are [0,1] or [1,0]
+        classes = list(getattr(model, "classes_", [0, 1]))
+        if 1 in classes:
+            threat_prob = float(proba[classes.index(1)])
+        else:
+            threat_prob = 1.0 - float(proba[0])
     else:
         pred = model.predict(X)[0]
         threat_prob = 1.0 if pred == 1 else 0.0
@@ -553,9 +561,8 @@ def _call_custom_ai(email_data: Dict) -> Optional[Dict]:
 
 def analyze_email_with_ai(email_data):
     """
-    Adaptive AI threat analysis using Google Gemini.
-    Detects ALL email threats: phishing, spear-phishing, BEC, 419 scams,
-    tech support scams, malware, spam, invoice fraud, impersonation, and social engineering.
+    Industry-standard threat analysis: (1) local trained model, (2) optional custom HTTP AI,
+    (3) rule-based fallback. Adaptive layer (domain reputation, feedback) applied to all paths.
     """
     ttl = getattr(config, "ANALYSIS_CACHE_TTL_SEC", 0)
     cache_key = _analysis_cache_key(email_data) if ttl > 0 else None
@@ -565,33 +572,23 @@ def analyze_email_with_ai(email_data):
             return cached
         del _analysis_cache[cache_key]
 
-    # Your trained local model (no API key, no quota) — train with train_scanner_model.py
-    if getattr(config, "AI_PROVIDER", "").lower() == "local":
+    provider = (getattr(config, "AI_PROVIDER", "") or "local").lower()
+
+    # 1. Local trained model (default, no external API)
+    if provider == "local":
         analysis = _call_trained_local_model(email_data)
         if analysis:
             result = _apply_adaptive_and_record(email_data, analysis)
             if ttl > 0 and cache_key:
                 _analysis_cache[cache_key] = (result, time.time())
             return result
-        # Model missing or failed: use rule-based
         result = _apply_adaptive_and_record(email_data, _fallback_analysis(email_data))
         if ttl > 0 and cache_key:
             _analysis_cache[cache_key] = (result, time.time())
         return result
 
-    # Fallback: no external AI (rule-based + adaptive)
-    use_fallback = (
-        getattr(config, "AI_PROVIDER", "fallback").lower() == "fallback"
-        or not getattr(config, "GEMINI_API_KEY", "")
-    )
-    if use_fallback and getattr(config, "AI_PROVIDER", "fallback").lower() != "custom":
-        result = _apply_adaptive_and_record(email_data, _fallback_analysis(email_data))
-        if ttl > 0 and cache_key:
-            _analysis_cache[cache_key] = (result, time.time())
-        return result
-
-    # Your own AI model (custom HTTP endpoint) — runs dynamically per email
-    if getattr(config, "AI_PROVIDER", "").lower() == "custom":
+    # 2. Custom HTTP AI endpoint (optional)
+    if provider == "custom":
         custom_url = getattr(config, "CUSTOM_AI_URL", "").strip()
         if custom_url:
             try:
@@ -604,194 +601,16 @@ def analyze_email_with_ai(email_data):
             except Exception as e:
                 print(f"[inbox_scanner] Custom AI error: {e}")
                 traceback.print_exc()
-        # Custom but no URL or request failed: use rule-based
         result = _apply_adaptive_and_record(email_data, _fallback_analysis(email_data))
         if ttl > 0 and cache_key:
             _analysis_cache[cache_key] = (result, time.time())
         return result
 
-    try:
-        import google.generativeai as genai
-        genai.configure(api_key=config.GEMINI_API_KEY)
-        model = genai.GenerativeModel(config.GEMINI_MODEL)
-
-        links_str = "\n".join(email_data.get("links", [])[:15]) if email_data.get("links") else "No links"
-        attachments_str = ", ".join(email_data.get("attachments", [])) if email_data.get("attachments") else "No attachments"
-        body = email_data.get("body_text", "") or _strip_html(email_data.get("body_html", ""))
-
-        sender_email_addr = email_data.get('sender_email', 'N/A')
-        sender_domain = sender_email_addr.split('@')[-1].lower() if '@' in sender_email_addr else ''
-        reply_to_addr = email_data.get('reply_to_email', '') or 'None'
-        auth = email_data.get('auth_results') or {}
-        auth_str = f"SPF={auth.get('spf', 'none')} DKIM={auth.get('dkim', 'none')} DMARC={auth.get('dmarc', 'none')}"
-
-        prompt = f"""You are an elite cybersecurity SOC analyst performing real-time threat triage on live email traffic.
-Classify this email with surgical precision. You MUST avoid false positives — marking safe emails as threats is a critical failure.
-
-=== CRITICAL: LEGITIMATE EMAIL RECOGNITION (CHECK THIS FIRST!) ===
-Before looking for threats, determine if this is a LEGITIMATE email:
-
-TRUSTED SENDER DOMAINS — emails from these domains are almost always SAFE:
-linkedin.com, facebookmail.com, google.com, youtube.com, microsoft.com,
-apple.com, amazon.com, github.com, openai.com, email.openai.com,
-netflix.com, twitter.com, x.com, instagram.com, spotify.com,
-slack.com, zoom.us, dropbox.com, adobe.com, salesforce.com,
-stripe.com, paypal.com, chase.com, bankofamerica.com, wellsfargo.com,
-intuit.com, turbotax.intuit.com, uber.com, lyft.com, airbnb.com,
-notion.so, figma.com, vercel.com, heroku.com, netlify.com,
-aws.amazon.com, cloud.google.com, azure.microsoft.com
-
-LEGITIMATE EMAIL PATTERNS (verdict = SAFE, threat_score 0-10):
-- Connection requests, job alerts, post notifications from LinkedIn
-- Privacy policy updates, account notifications from any trusted domain
-- Order confirmations, shipping updates from e-commerce
-- Newsletter/digest emails from services the user signed up for
-- Password reset emails that the user likely requested
-- Two-factor authentication codes
-- Calendar invites from known services
-- Social media notifications (likes, comments, follows, shares)
-- Subscription confirmations, billing receipts from known services
-
-KEY RULE: If sender domain matches a known service AND email content matches
-that service's typical notifications, it is SAFE. Do NOT penalize:
-- Emails containing "unsubscribe" (this is in ALL legitimate emails)
-- Emails with tracking links from known services (e.g., linkedin.com click-tracking)
-- Generic notification language from real services
-- Marketing emails from legitimate brands the user subscribed to
-
-=== DETECTION METHODS (use these in your analysis) ===
-1. LOOKALIKE DOMAINS: Sender domain similar to a brand but not exact (e.g. gmail.co, paypa1.com) → IMPERSONATION/PHISHING.
-2. REPLY-TO MISMATCH: If Reply-To header differs from From domain, replies may go to attacker → high severity red flag.
-3. LINK DISPLAY MISMATCH: If link text shows a safe URL but href points elsewhere → PHISHING, critical.
-4. DISPLAY NAME SPOOFING: Display name claims brand but From is free email (gmail, yahoo) → IMPERSONATION.
-5. URGENCY + UNTRUSTED SENDER: "Act now", "suspended", "within 24 hours" from unknown sender → SOCIAL ENGINEERING.
-
-=== THREAT CATEGORIES (only if NOT legitimate) ===
-1. PHISHING: Credential harvesting, fake login pages, account verification scams
-2. SPEAR PHISHING: Targeted attacks using specific names, roles, or internal info
-3. BEC (Business Email Compromise): CEO fraud, invoice redirect, wire transfer requests
-4. 419 / ADVANCE FEE SCAM: Inheritance, lottery winnings, investment schemes
-5. TECH SUPPORT SCAM: Fake virus alerts, "device infected", call-this-number
-6. MALWARE: Dangerous attachments (.exe .bat .scr macro-enabled docs)
-7. SPAM: Unsolicited marketing from UNKNOWN senders, crypto pumps, adult content
-8. INVOICE / PAYMENT FRAUD: Fake invoices, overdue notices, fake receipts
-9. IMPERSONATION: Display name spoofing, look-alike domains, brand impersonation
-10. SOCIAL ENGINEERING: Curiosity traps, fake leaked docs, fake emergencies
-
-=== HOW TO DISTINGUISH SPAM FROM LEGITIMATE ===
-- SPAM = unsolicited from unknown/untrusted senders with aggressive marketing
-- LEGITIMATE = notifications, updates, newsletters from trusted brands/services
-- If sender domain is a known company, it is NOT spam even if promotional
-- LinkedIn notifications are NOT spam — they are service notifications
-- OpenAI policy updates are NOT spam — they are account notifications
-
-=== ANALYSIS RULES ===
-- FIRST check if the sender domain is a known service. If YES, default to SAFE.
-- Only override SAFE if there is STRONG evidence of compromise/spoofing.
-- Flag MISMATCHES: Display name "PayPal Support" but email is random@gmail.com = PHISHING.
-- SIMULATION MARKERS: "[PhishGuard AI Simulation]" or "simulated phishing" = PHISHING.
-- Free email providers (gmail, outlook, yahoo) sending as brands = SUSPICIOUS/PHISHING.
-
-=== EMAIL AUTHENTICATION (industry standard) ===
-- Use Authentication-Results to weight spoofing. If SPF/DKIM/DMARC = fail or none and the sender claims to be a brand (e.g. PayPal, Microsoft), treat as strong evidence of IMPERSONATION/PHISHING.
-- pass = legitimate; fail/none = possible spoof, especially if From domain claims to be a known brand.
-
-=== SCORING RULES ===
-- threat_score 0–100: 0–15 SAFE, 16–35 low risk, 36–55 SUSPICIOUS, 56–100 PHISHING/SCAM.
-- Assign sub_scores (0–40 each) for each category that applies; most emails will have 0 for most.
-- risk_level: "low" (SAFE), "medium" (spam), "high" (suspicious), "critical" (phishing/scam/malware).
-- confidence: higher when evidence is clear (e.g. auth fail + brand claim = 90+).
-
-=== EMAIL DATA ===
-Subject: {email_data.get('subject', 'N/A')}
-From (Display Name): {email_data.get('sender_name', 'N/A')}
-From (Email): {sender_email_addr}
-Reply-To: {reply_to_addr}
-Sender Domain: {sender_domain}
-Authentication-Results: {auth_str}
-Date: {email_data.get('date', 'N/A')}
-
-Body (first 2000 chars):
-{body[:2000]}
-
-Links:
-{links_str}
-
-Attachments:
-{attachments_str}
-
-=== RESPOND WITH ONLY VALID JSON ===
-{{
-    "verdict": "<SAFE|SUSPICIOUS|PHISHING|SPAM|SCAM>",
-    "confidence": <0-100>,
-    "threat_score": <0-100>,
-    "risk_level": "<low|medium|high|critical>",
-    "sub_scores": {{
-        "phishing": <0-40>,
-        "impersonation": <0-40>,
-        "scam": <0-40>,
-        "spam": <0-25>,
-        "malware": <0-40>,
-        "bec": <0-40>,
-        "social_engineering": <0-30>
-    }},
-    "summary": "<1-2 sentence precise explanation>",
-    "red_flags": [
-        {{
-            "flag": "<Short title>",
-            "severity": "<low|medium|high|critical>",
-            "explanation": "<Evidence-based reason>"
-        }}
-    ],
-    "positive_signals": ["<Evidence of legitimacy>"],
-    "category": "<legitimate|newsletter|transactional|phishing|spear_phishing|bec|scam|spam|malware|impersonation|social_engineering>",
-    "recommendation": "<Actionable advice>"
-}}"""
-
-        response = model.generate_content(prompt)
-        text = response.text.strip()
-
-        if text.startswith("```"):
-            text = text.split("\n", 1)[1]
-            text = text.rsplit("```", 1)[0].strip()
-
-        analysis = json.loads(text)
-        analysis["ai_powered"] = True
-        # Ensure scoring fields exist for consistent downstream use
-        if "risk_level" not in analysis:
-            thr_phish, thr_susp, thr_spam = _get_thresholds()
-            sc = analysis.get("threat_score", 0)
-            analysis["risk_level"] = (
-                "critical" if sc >= thr_phish else "high" if sc >= thr_susp else "medium" if sc >= thr_spam else "low"
-            )
-        if "sub_scores" not in analysis:
-            analysis["sub_scores"] = {
-                "phishing": 0, "impersonation": 0, "scam": 0, "spam": 0,
-                "malware": 0, "bec": 0, "social_engineering": 0,
-            }
-        thr_phish, thr_susp, thr_spam = _get_thresholds()
-        if analysis.get("risk_level") is None and "threat_score" in analysis:
-            sc = analysis["threat_score"]
-            analysis["risk_level"] = "critical" if sc >= thr_phish else "high" if sc >= thr_susp else "medium" if sc >= thr_spam else "low"
-        result = _apply_adaptive_and_record(email_data, analysis)
-        if ttl > 0 and cache_key:
-            _analysis_cache[cache_key] = (result, time.time())
-        return result
-
-    except Exception as e:
-        print(f"[inbox_scanner] Gemini analysis error: {e}")
-        traceback.print_exc()
-        # When Gemini fails (e.g. quota exceeded), try our trained model first, then rules
-        analysis = _call_trained_local_model(email_data)
-        if analysis:
-            result = _apply_adaptive_and_record(email_data, analysis)
-            if ttl > 0 and cache_key:
-                _analysis_cache[cache_key] = (result, time.time())
-            return result
-        result = _apply_adaptive_and_record(email_data, _fallback_analysis(email_data))
-        if ttl > 0 and cache_key:
-            _analysis_cache[cache_key] = (result, time.time())
-        return result
+    # 3. Rule-based only (AI_PROVIDER=rules or when local/custom not available)
+    result = _apply_adaptive_and_record(email_data, _fallback_analysis(email_data))
+    if ttl > 0 and cache_key:
+        _analysis_cache[cache_key] = (result, time.time())
+    return result
 
 
 def _strip_html(html_str):
@@ -824,8 +643,12 @@ def _apply_adaptive_and_record(email_data: Dict, analysis: Dict) -> Dict:
     """
     Apply dynamic learning: adjust threat_score from domain reputation, similar-past prior,
     and optional online classifier; then persist this scan for future learning.
+    When SCANNER_EVAL_MODE=1 (e.g. train_and_check evaluation), skip adaptive layer
+    so "via scanner" reflects only the local model + thresholds.
     """
     if not _ADAPTIVE_AVAILABLE:
+        return analysis
+    if os.environ.get("SCANNER_EVAL_MODE", "").strip() == "1":
         return analysis
     try:
         delta_info = get_adaptive_delta(email_data)
